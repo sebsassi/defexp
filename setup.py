@@ -1,12 +1,11 @@
-from distutils.core import setup
-from distutils.extension import Extension
-import numpy
 import os
+import sys
+from setuptools import setup, Extension
+import numpy
 
-cython_environment_variable = "USE_CYTHON"
-USE_CYTHON = bool(int(os.environ.get(cython_environment_variable, None)))
+USE_CYTHON = bool(int(os.environ.get("USE_CYTHON", "0")))
 
-inc_dirs = [numpy.get_include()]
+inc_dirs = [numpy.get_include(), "defexp/cinclude"]
 
 suffix = ".pyx" if USE_CYTHON else ".c"
 
@@ -14,8 +13,8 @@ extensions = [
         Extension(
                 "voronoi_occupation",
                 [
-                    "voronoi_occupation" + suffix,
-                    "voronoi_occupation_c.c"],
+                    "defexp/defexp.voronoi_occupation" + suffix,
+                    "defexp/csrc/voronoi_occupation_c.c"],
                 include_dirs=inc_dirs,
                 extra_compile_args=["-O3", "-Wall", "-Wextra", "-Wconversion", "-Wpedantic"])
               ]
@@ -26,4 +25,3 @@ if USE_CYTHON:
     print("Using Cython")
 
 setup(ext_modules=extensions)
-        

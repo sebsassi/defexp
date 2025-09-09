@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "defexp"
+version = "0.0.0"
+description = "Just some scripts for running LAMMPS simulations"
+requires-python = ">= 3.13"
+dependencies = [
+    "numpy",
+    "ase"
+]
+
+[tool.setuptools]
+packages = ["defexp"]

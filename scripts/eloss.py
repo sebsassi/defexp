@@ -4,7 +4,6 @@ import json
 import os
 import logging
 
-import materials
 import defexp
 
 import numpy as np

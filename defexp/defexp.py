@@ -1527,7 +1527,7 @@ def symbols_from(atom_props: dict[str, typing.Any]) -> list[str]:
     -------
     list
     """
-    return [value["symbol"] for key, value in atom_props.items()]
+    return [value["symbol"] for value in atom_props.values()]
 
 
 def load_material(dir: str, label: str) -> defexp.Material:
@@ -1555,8 +1555,11 @@ def load_material(dir: str, label: str) -> defexp.Material:
         config["atom_props"],
         config["unit_cell"],
         config["unit_cell_atoms"],
-        getattr(defexp, config["pair_potential"])(
-            config["pot_file"], symbols_from(config["atom_props"])),
+        Pair(
+            config["pair_potential"]["style_name"],
+            config["pair_potential"]["pot_file"],
+            list(config["pair_potential"]["style_args"].values()),
+            symbols_from(config["atom_props"])),
         config["label"])
 
 

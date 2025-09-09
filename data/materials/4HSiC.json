@@ -33,6 +33,9 @@
             "symbol": "C"
         },
     },
-    "pair_potential": "GWPair",
-    "pot_file": "SiC.gw",
+    "pair_potential": {
+        "style_name": "gw",
+        "pot_file": "SiC.gw",
+        "style_args": [],
+    }
 }

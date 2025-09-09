@@ -77,6 +77,13 @@
             "symbol": "O"
         },
     },
-    "pair_potential": "VashishtaPair",
-    "pot_file": "AlO.Vashishta",
+    "pair_potential": {
+        "style_name": "vashishta/table",
+        "pot_file": "AlO.Vashishta",
+        "style_args": {
+            "N": 100000,
+            "cutoff": 0.2,
+        },
+        "coeff_args": ["Al", "O"],
+    }
 }

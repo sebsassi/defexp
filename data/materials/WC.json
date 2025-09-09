@@ -15,6 +15,9 @@
         "1": {"mass": 12.011, "symbol": "C"},
         "2": {"mass": 183.84, "symbol": "W"}
     },
-    "pair_potential": "TersoffZBLPair",
-    "pot_file": "WCH.tersoff.zbl",
+    "pair_potential": {
+        "style_name": "tersoff/zbl",
+        "pot_file": "WCH.tersoff.zbl",
+        "style_args": [], 
+    },
 }

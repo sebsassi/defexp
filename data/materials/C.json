@@ -21,6 +21,9 @@
             "symbol": "C"
         },
     },
-    "pair_potential": "TersoffPair",
-    "pot_file": "C_nordlund.tersoff",
+    "pair_potential": {
+        "style_name": "tersoff/table",
+        "pot_file": "C_nordlund.tersoff",
+        "style_args": [],
+    }
 
