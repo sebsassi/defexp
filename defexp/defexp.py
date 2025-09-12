@@ -12,6 +12,7 @@ import time
 import typing
 import types
 import subprocess
+import json
 
 import numpy as np
 import numpy.ma as ma
@@ -192,7 +193,7 @@ def read_lammps_data(filename: str, verbosity: int = 0) -> ase.Atoms:
     with open(filename, "r") as f:
         if verbosity > 1: logging.debug(f"Opened {filename} in read mode.")
         atoms = ase.io.lammpsdata.read_lammps_data(
-                f, style="atomic", sort_by_id=True)
+                f, atom_style="atomic", sort_by_id=True)
         if verbosity > 1: logging.debug(f"Read data from {filename}.")
     return atoms
 
@@ -212,7 +213,7 @@ def read_thermo_info(filename: str, verbosity: int = 1) -> dict[str, np.ndarray]
         Dictionary containing thermodynamic output from the log file. Each
         key-value pair corresponds to a column of the thermodynamic output.
     """
-    with open(tf_name, "r") as thermo_file:
+    with open(filename, "r") as thermo_file:
         if verbosity > 1:
             logging.debug(f"Opened file {tf_name} in append mode.")
         thermo_info = parse_log_file(thermo_file)
@@ -284,15 +285,14 @@ def run_lammps(
     """
     args = []
 
-    if threads > 1: run.append(f"mpirun -np {threads:d}")
+    if threads > 1: args += ["mpirun", "-np", str(threads)]
 
-    args += [binary, f"-in \"{in_file}\""]
-
-    if largs: run.append(" ".join(f"-{k} {v}" for k, v in largs.items()))
-    if lvars: run.append(" ".join(f"-v {k} {v}" for k, v in lvars.items()))
+    args += [binary, "-in", str(in_file)]
+    args += sum([[f"-{k}", str(v)] for k, v in largs.items()], start=[])
+    args += sum([["-v", str(k), str(v)] for k, v in lvars.items()], start=[])
 
     if verbosity > 1:
-        log_print(" ".join(args))
+        log_print(" ".join(str(arg) for arg in args))
     if timer:
         start_time = time.time()
     process = subprocess.run(args, capture_output=True, text=True)
@@ -482,125 +482,6 @@ class Pair:
         self.coeff_args = coeff_args
 
 
-def VashishtaPair(
-    pot_filename: str, atom_symbols: list, table: bool = True, N: int = 100000,
-    cutoff: float = 0.2
-) -> Pair:
-    """
-    Pair style for a Vashishta type potential.
-
-    Parameters
-    ----------
-    pot_filename : str
-        Name of the potential file.
-    atom_symbols : list
-        Chemical symbols of atoms appearing in the potential file.
-    table : bool, optioonal
-        If true, interpolate from tabulated potential function values to speed
-        up simulations.
-    N : int, optional
-        Number of tabulation points to use. See LAMMPS documentation for
-        recommendations.
-    cutoff : float, optional
-        Inner cutoff distance for the tabulation.
-
-    Returns
-    -------
-    Pair
-    """
-    style_name = "vashishta/table" if table else "vashishta"
-    style_args = (N, cutoff) if table else ()
-    return Pair(style_name, pot_filename, style_args, atom_symbols)
-
-
-def GWPair(pot_filename: str, atom_symbols: list) -> Pair:
-    """
-    Pair style for a Gao-Weber type potential.
-
-    Parameters
-    ----------
-    pot_filename : str
-        Name of the potential file.
-    atom_symbols : list
-        Chemical symbols of atoms appearing in the potential file.
-
-    Returns
-    -------
-    Pair
-    """
-    return Pair("gw", pot_filename, (), atom_symbols)
-
-
-def TersoffPair(
-    pot_filename: str, atom_symbols: list, table: bool = True
-) -> Pair:
-    """
-    Pair style for a Tersoff type potential.
-
-    Parameters
-    ----------
-    pot_filename : str
-        Name of the potential file.
-    atom_symbols : list
-        Chemical symbols of atoms appearing in the potential file.
-    table : bool, optional
-        If true, interpolate from tabulated potential function values to speed
-        up simulations.
-
-    Returns
-    -------
-    Pair
-    """
-    style_name = "tersoff/table" if table else "tersoff"
-    return Pair(style_name, pot_filename, (), atom_symbols)
-
-
-def TersoffZBLPair(pot_filename: str, atom_symbols: list) -> Pair:
-    """
-    Pair style for a Tersoff-ZBL type potential.
-
-    Parameters
-    ----------
-    pot_filename : str
-        Name of the potential file.
-    atom_symbols : list
-        Chemical symbols of atoms appearing in the potential file.
-
-    Returns
-    -------
-    Pair
-    """
-    return Pair("tersoff/zbl", pot_filename, (), atom_symbols)
-
-
-def EAMPair(pot_filename: str, atom_symbols: list, fs: bool = False) -> Pair:
-    """
-    Pair style for an EAM type potential.
-
-    Parameters
-    ----------
-    pot_filename : str
-        Name of the potential file.
-    atom_symbols : list
-        Chemical symbols of atoms appearing in the potential file.
-    fs : bool, optional
-        Use Finnis-Sinclair forms of potential
-
-    Returns
-    -------
-    Pair
-    """
-    meta_data = pot_filename.split(".")
-    if meta_data[-2] == "eam" and meta_data[-1] == "fs":
-        return Pair("eam/fs", pot_filename, (), atom_symbols)
-    elif meta_data[-1] == "eam":
-        return Pair("eam", pot_filename, (), ())
-    else:
-        raise ValueError(
-                "EAM Potential file name must end in .eam, or .eam.fs if "
-                "Finnis-Sinclair potential is used.")
-
-
 class Material:
     """
     Class describing a crystalline material for LAMMPS defect simulations.
@@ -625,7 +506,7 @@ class Material:
     """
     def __init__(
         self, atom_props: dict, unit_cell: np.ndarray,
-        unit_cell_atoms: np.ndarray, repeat: tuple, pair_potential: Pair, 
+        unit_cell_atoms: np.ndarray, pair_potential: Pair, 
         label: str
     ):
         """
@@ -654,10 +535,6 @@ class Material:
         self.pair_potential = pair_potential
 
 
-    def lattice(self, repeat: tuple[int]) -> ase.Atoms:
-        return make_atoms(self.unit_cell, self.unit_cell_atoms, repeat, self.data_dir)
-
-
 class Lattice:
     """
     Class describing a lattice of atoms for LAMMPS simulations.
@@ -673,7 +550,7 @@ class Lattice:
     block : np.ndarray
         Box containing the atoms.
     """
-    def __init__(material: Material, repeat: tuple[int]):
+    def __init__(self, material: Material, repeat: tuple[int]):
         """
         Parameters
         ----------
@@ -684,7 +561,7 @@ class Lattice:
         """
         self.material = material
         self.repeat = repeat
-        self.atoms = material.lattice(repeat)
+        self.atoms = make_atoms(self.material.unit_cell, self.material.unit_cell_atoms, self.repeat)
         self.repeat = repeat
         self.block = np.stack((
                 repeat[0]*self.material.unit_cell[0],
@@ -813,7 +690,7 @@ class ExperimentIO:
         self, label: str, res_dir: str, thermo_dir: str, log_dir: str,
         save_thermo: typing.Optional[list] = None,
     ):
-        self.label = experiment_label
+        self.label = label
 
         self.res_dir = res_dir
         self.thermo_dir = thermo_dir
@@ -887,10 +764,11 @@ class ExperimentIO:
 
 
 class LAMMPSIO:
-    def __init__(self, experiment_label: str, lmp_dir: str, dump_dir: str):
+    def __init__(self, experiment_label: str, work_dir: str, dump_dir: str):
         self.label = experiment_label
 
-        self.lmp_dir = lmp_dir
+        self.script_dir = f"{os.path.dirname(os.path.dirname(__file__))}/lammpsin"
+        self.work_dir = work_dir
         self.dump_dir = dump_dir
 
         self.make_dirs()
@@ -901,7 +779,7 @@ class LAMMPSIO:
         Checks if directories for output data exists and creates them if they
         do not.
         """
-        if not os.path.isdir(self.lmp_dir): os.mkdir(self.lmp_dir)
+        if not os.path.isdir(self.work_dir): os.mkdir(self.work_dir)
         if self.dump_dir is not None:
             if not os.path.isdir(self.dump_dir): os.mkdir(self.dump_dir)
 
@@ -910,15 +788,23 @@ class LAMMPSIO:
         os.system(f"rm {self.dump_dir}/*.dump {self.dump_dir}/*.dump.gz")
 
 
+    def relax_script_path(self):
+        return f"{self.script_dir}/relaxation.lammpsin"
+
+
+    def impact_script_path(self):
+        return f"{self.script_dir}/impact.lammpsin"
+
+
     def relaxation_log_fname(self, uid=None) -> str:
         if uid is None:
-            return f"{self.lmp_dir}/{self.label}_relaxation.log"
+            return f"{self.work_dir}/{self.label}_relaxation.log"
         else:
-            return f"{self.lmp_dir}/{self.label}_relaxation_{uid:d}.log"
+            return f"{self.work_dir}/{self.label}_relaxation_{uid:d}.log"
 
 
     def pair_file_name(self, material: Material) -> str:
-        return f"{self.lmp_dir}/{material.label}_pair.lammpsin"
+        return f"{self.work_dir}/{material.label}_pair.lammpsin"
 
 
     def write_pair_file(self, material: Material, verbosity: int = 0):
@@ -936,7 +822,7 @@ class LAMMPSIO:
 
 
     def mass_file_name(self, material: Material) -> str:
-        return f"{self.lmp_dir}/{material.label}_masses.lammpsin"
+        return f"{self.work_dir}/{material.label}_masses.lammpsin"
 
 
     def write_mass_file(self, material: Material, verbosity: int = 0):
@@ -957,11 +843,11 @@ class LAMMPSIO:
         if verbosity > 1: log_print(f"Wrote mass file {fname}.")
 
 
-    def data_file_name(lattice: Lattice, label: str) -> str:
-        return f"{self.lmp_dir}/{lattice.material.label}_{label}.data"
+    def data_file_name(self, lattice: Lattice, label: str) -> str:
+        return f"{self.work_dir}/{lattice.material.label}_{label}.data"
 
 
-    def write_lammps_data(self, lattice: Lattice, data_dir: str, verbosity: int = 0):
+    def write_lammps_data(self, lattice: Lattice, label: str, verbosity: int = 0):
         """
         Writes the lattice data into a file that can be read by LAMMPS.
 
@@ -969,7 +855,7 @@ class LAMMPSIO:
         ----------
         verbosity : int, optional
         """
-        fname = self.data_file_name(lattice)
+        fname = self.data_file_name(lattice, label)
         ase.io.lammpsdata.write_lammps_data(
                 fname, lattice.atoms, atom_style="atomic")
         if verbosity > 1: log_print(f"Wrote file {fname}.")
@@ -991,7 +877,7 @@ class LAMMPSIO:
         tf_name : str
             Name of thermo data file.
         """
-        name = f"{self.lmp_dir}/{self.label}_impact_{pid}"
+        name = f"{self.work_dir}/{self.label}_impact_{pid}"
         df_name = f"{name}.data"
         tf_name = f"{name}.log"
         if not os.path.isfile(df_name): open(df_name,"a").close()
@@ -1067,15 +953,12 @@ class RelaxSimulation:
         config_path : str, optional
             Path to config file directory.
         """
-        # Material
-        self.material = material
-        self.material.write_mass_file(verbosity)
-        self.material.write_pair_file(verbosity)
-
         self.lattice = lattice
-        self.lattice.write_lammps_data(verbosity)
 
         self.lammps_io = lammps_io
+        self.lammps_io.write_lammps_data(self.lattice, "default", verbosity)
+        self.lammps_io.write_mass_file(self.lattice.material, verbosity)
+        self.lammps_io.write_pair_file(self.lattice.material, verbosity)
 
         # Logging
         self.verbosity = verbosity
@@ -1094,7 +977,7 @@ class RelaxSimulation:
         self.num_step = int(duration/timestep)
 
 
-    def run(self, uid=None):
+    def run(self, uid: typing.Any = None, verbosity: int = 1):
         """
         Run the simulation.
 
@@ -1113,15 +996,15 @@ class RelaxSimulation:
             "DT": self.timestep,
             "T": self.temperature,
             "STEP": self.num_step,
-            "INDNAME": f"\"{self.lattice.data_file_name(lattice, "default"}\"",
-            "OUTDNAME": f"\"{self.lammps_io.data_file_name(lattice, "relaxed")}\"",
-            "MFNAME": f"\"{self.lammps_io.mass_filename(self.lattice.material)}\"",
-            "PFNAME": f"\"{self.lammps_io.pair_filename(self.lattice.material)}\""
+            "INDNAME": f"{self.lammps_io.data_file_name(self.lattice, "default")}",
+            "OUTDNAME": f"{self.lammps_io.data_file_name(self.lattice, "relaxed")}",
+            "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
+            "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}"
         }
         run_lammps(
-            f"{self.lammps_io.config_path}/lammpsin/relaxation.lammpsin", lammps_args,
+            self.lammps_io.relax_script_path(), lammps_args,
             relaxation_vars, threads=self.lammps_threads, binary=self.binary,
-            timer=self.time_lammps)
+            timer=self.time_lammps, verbosity=verbosity)
 
 
 class RecoilSimulation:
@@ -1265,20 +1148,20 @@ class RecoilSimulation:
             Number of initial steps to run before generating the recoil.
         """
         vel = velocity_from(
-            energy,
-            self.material.atom_props[atom_type]["mass"]*0.93149410242,
+            energy*1.0e-9,
+            self.lattice.material.atom_props[atom_type]["mass"]*0.93149410242,
             unitv)
         dumpint = max(self.num_step//1000, 1)
         return {
             "ASTYLE": "atomic",
             "DT": self.timestep,
-            "INDNAME": f"\"{self.lammps_io.data_file_name(self.lattice, "relaxed")}\"",
-            "OUTDNAME": f"\"{df_name}\"",
-            "MFNAME": f"\"{self.lammps_io.mass_filename(self.lattice.material)}\"",
-            "PFNAME": f"\"{self.lammps_io.pair_filename(self.lattice.material)}\"",
+            "INDNAME": f"{self.lammps_io.data_file_name(self.lattice, "relaxed")}",
+            "OUTDNAME": f"{df_name}",
+            "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
+            "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}",
             "DUMP": int(self._dump),
             "DUMPINT": dumpint,
-            "DUMPDIR": f"\"{self.lammps_io.dump_dir}\"",
+            "DUMPDIR": f"{self.lammps_io.dump_dir}",
             "T": self.temperature,
             "ISTEP": istep,
             "STEP": self.num_step,
@@ -1292,8 +1175,8 @@ class RecoilSimulation:
 
 
     def check_for_anomalous_defect(
-        has_frenkel_defect: bool, has_epot_defect: bool, pid: int,
-        logfname: str, unitv: np.ndarray, energy: float, verbosity: int
+        self, has_frenkel_defect: bool, has_epot_defect: bool, pid: int,
+        unitv: np.ndarray, energy: float, verbosity: int
     ):
         has_defect_anomaly = ((has_frenkel_defect and not has_epot_defect)
                               or (not has_frenkel_defect and has_epot_defect))
@@ -1357,7 +1240,7 @@ class RecoilSimulation:
 
         Returns
         -------
-        dEpot : float
+        depot : float
             Change in potential energy from the start of the simulation to the
             end of the simulation.
         has_frenkel_defect : bool
@@ -1366,7 +1249,7 @@ class RecoilSimulation:
         impact_vars = self.impact_vars(
             aind, atom_type, energy, unitv, df_name, istep=20, seed=seed)
         run_lammps(
-            f"{self.config_path}/lammpsin/impact.lammpsin", lammps_args, 
+            self.lammps_io.impact_script_path(), lammps_args, 
             impact_vars, self.lammps_threads, binary=self.binary,
             timer=self.time_lammps)
 
@@ -1394,7 +1277,7 @@ class RecoilSimulation:
         if verbosity > 2:
             log_print(f"Checked potential energy. Difference: {depot}")
 
-        has_epot_defect = dEpot > self.defect_threshold
+        has_epot_defect = depot > self.defect_threshold
         if log_res and test_frenkel:
             log_print(
                 f"Frenkel defect: {has_frenkel_defect}\n"
@@ -1402,14 +1285,13 @@ class RecoilSimulation:
 
         if test_frenkel:
             self.check_for_anomalous_defect(
-                has_frenkel_defect, has_epot_defect, pid, logfname, unitv,
-                energy, verbosity)
+                has_frenkel_defect, has_epot_defect, pid, unitv, energy, verbosity)
 
         return depot, has_frenkel_defect
 
 
 def scan_energy_range(
-    recoil_simulation: defexp.RecoilSimulation, atom_type: int, aind: int,
+    recoil_simulation: RecoilSimulation, atom_type: int, aind: int,
     unitv: np.ndarray, energies: np.ndarray, pid: int, verbosity: int = 1,
     screen: typing.Optional[str] = None, **kwargs
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -1431,7 +1313,7 @@ def scan_energy_range(
 
     Returns
     -------
-    dEpot : np.ndarray
+    depot : np.ndarray
         Changes in potential energies from the start of the simulation to the
         end of the simulation.
     frenkel_defects : np.ndarray
@@ -1444,13 +1326,13 @@ def scan_energy_range(
     if screen is not None:
         lammps_args["screen"] = screen
 
-    dEpot = np.zeros(energies.shape)
+    depot = np.zeros(energies.shape)
     frenkel_defects = np.full(energies.shape, False)
     for i in range(energies.shape[0]):
         if verbosity == 2:
-            defexp.log_print(f"Energy {i + 1:d}/{energies.shape[0]:d}.")
+            log_print(f"Energy {i + 1:d}/{energies.shape[0]:d}.")
         elif verbosity > 2:
-            defexp.log_print(
+            log_print(
                 f"Energy {i + 1:d}/{energies.shape[0]:d}: "
                     f"{energies[i]:.5e}.")
 
@@ -1489,7 +1371,7 @@ def sample_thermal_distribution(
 
     Returns
     -------
-    dEpot : np.ndarray
+    depot : np.ndarray
         Changes in potential energies from the start of the simulation to the
         end of the simulation.
     frenkel_defects : np.ndarray
@@ -1510,7 +1392,7 @@ def sample_thermal_distribution(
     for i in range(count):
         depot[i], frenkel_defects[i] = recoil_simulation.run(
             atom_type, aind, unitv, energy, df_name, lammps_args, tf_name,
-            pid, seed=seeds[i], verbosity, **kwargs)
+            pid, seed=seeds[i], verbosity=verbosity, **kwargs)
 
     return depot, frenkel_defects
 
@@ -1530,16 +1412,18 @@ def symbols_from(atom_props: dict[str, typing.Any]) -> list[str]:
     return [value["symbol"] for value in atom_props.values()]
 
 
-def load_material(dir: str, label: str) -> defexp.Material:
+def load_material(material_dir: str, potential_dir, label: str) -> Material:
     """
     Load material based on data in a config file.
 
     Parameters
     ----------
-    dir : str
-        Materials directory.
+    material_dir : str
+        Directory containing material file.
+    potential_dir : str
+        Directory containing potential file.
     label : str
-        Name of material.
+        Label for the material.
 
     Returns
     -------
@@ -1548,21 +1432,21 @@ def load_material(dir: str, label: str) -> defexp.Material:
     def parse_int_keys(x):
         return {int(k) if k.isdigit() else k: v for k, v in x}
 
-    with open(f"{dir}/{label}.json", "r") as f:
+    with open(f"{material_dir}/{label}.json", "r") as f:
         config = json.load(f, object_pairs_hook=parse_int_keys)
 
-    return defexp.Material(
+    return Material(
         config["atom_props"],
-        config["unit_cell"],
-        config["unit_cell_atoms"],
+        np.array(config["unit_cell"]),
+        np.array(config["unit_cell_atoms"]),
         Pair(
             config["pair_potential"]["style_name"],
-            config["pair_potential"]["pot_file"],
+            f"{potential_dir}/{config["pair_potential"]["pot_file"]}",
             list(config["pair_potential"]["style_args"].values()),
             symbols_from(config["atom_props"])),
         config["label"])
 
 
-def load_sim_info(dir: str, label: st) -> dict:
-    with open(f"{dir}/{label}.json", "r") as f:
+def load_sim_info(sim_info_dir: str, label: str) -> dict:
+    with open(f"{sim_info_dir}/{label}.json", "r") as f:
         return json.load(f)

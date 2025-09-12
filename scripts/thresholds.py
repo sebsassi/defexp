@@ -104,7 +104,7 @@ def execute(
 
 
 if __name__ == "__main__":
-    print("Running thresholds.py")
+    print("Running eloss.py")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material label")

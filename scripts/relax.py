@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 
+import numpy as np
+
 import defexp
 
 if __name__ == "__main__":
@@ -10,9 +12,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material label")
     parser.add_argument("-b", "--binary", type=str, default=None)
-    parser.add_argument(
-            "--pot", type=str, default="", help="potential file name")
-    parser.add_argument("-c", "--configpath", type=str, default=defexp.default_config_path())
+    parser.add_argument("-c", "--configpath", type=str, default=".")
+    parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     args = parser.parse_args()
 
@@ -32,11 +33,11 @@ if __name__ == "__main__":
     thermo_dir = f"{args.work_dir}/thermo"
     log_dir = f"{args.work_dir}/logs"
 
-    material = materials.load_material(f"{args.configpath}/materials", args.material)
-    sim_info = defexp.load_sim_info(f"{args.configpath}/simulations", args.material)
+    material = defexp.load_material(f"{args.configpath}/materials", f"{args.configpath}/potentials", args.material)
+    sim_info = defexp.load_sim_info(f"{args.configpath}/sim_info", args.material)
     energies = np.loadtxt(f"{args.configpath}/energies/{args.material}.dat")
 
-    lattice = material.lattice(sim_info["repeat"])
+    lattice = defexp.Lattice(material, sim_info["repeat"])
 
     label = f"relax_{material.label}"
     exp_io = defexp.ExperimentIO(
@@ -51,4 +52,4 @@ if __name__ == "__main__":
             timestep=sim_info["timestep"], duration=sim_info["impact_duration"],
             temperature=sim_info["temperature"])
 
-    simulation.run()
+    simulation.run(verbosity=2)

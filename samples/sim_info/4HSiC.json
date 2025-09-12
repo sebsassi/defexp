@@ -5,5 +5,5 @@
     "relax_duration": 1.0,
     "impact_duration": 4.0,
     "emin": 0.0,
-    "emax": 200.0,
+    "emax": 200.0
 }

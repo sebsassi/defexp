@@ -65,7 +65,7 @@
     "unit_cell": [
         [4.760200, 0.000000, 0.000000],
         [0.000000, 8.244908, 0.000000],
-        [0.000000, 0.000000, 12.99330],
+        [0.000000, 0.000000, 12.99330]
     ],
     "atom_props": {
         "1": {
@@ -75,15 +75,15 @@
         "2": {
             "mass": 15.9994,
             "symbol": "O"
-        },
+        }
     },
     "pair_potential": {
         "style_name": "vashishta/table",
-        "pot_file": "AlO.Vashishta",
+        "pot_file": "AlO.vashishta",
         "style_args": {
             "N": 100000,
-            "cutoff": 0.2,
+            "cutoff": 0.2
         },
-        "coeff_args": ["Al", "O"],
+        "coeff_args": ["Al", "O"]
     }
 }

@@ -3,37 +3,45 @@ import argparse
 import json
 import os
 import logging
-
-import defexp
+import typing
 
 import numpy as np
 
+import defexp
+
 
 def random_energy_loss(
-    recoil_simulation: RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, aind: int, pid: int, verbosity: int = 1, **kwargs
+    recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
+    emin: float, emax: float, aind: int, pid: int,
+    screen: typing.Optional[str] = None, verbosity: int = 1, **kwargs
 ):
     rng = np.random.default_rng(seed)
-    alt, az = uniform_angles(rng, count)
+    alt, az = defexp.uniform_angles(rng, count)
     energies = emin + (emax - emin)*rng.random(count)
-    unitv = angles_to_vec(alt, az)
+    unitv = defexp.angles_to_vec(alt, az)
 
     atom_type = recoil_simulation.lattice.atoms.numbers[aind]
 
-    if "symbol" in recoil_simulation.material.atom_props[atom_type]:
-        aid = recoil_simulation.material.atom_props[atom_type]["symbol"]
+    if "symbol" in recoil_simulation.lattice.material.atom_props[atom_type]:
+        aid = recoil_simulation.lattice.material.atom_props[atom_type]["symbol"]
     else:
         aid = str(atom_type)
 
-    result_fname = (f"{recoil_simulation.io.resdir}/"
+    result_fname = (f"{recoil_simulation.io.res_dir}/"
             f"random_energy_loss_{aid}_{aind}_{pid}.dat")
-    ensure_file_ends_with_new_line(result_fname, verbosity)
+    defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
+
+    df_name, tf_name = recoil_simulation.lammps_io.create_data_and_thermo_file(pid)
+
+    lammps_args = {"log": tf_name}
+    if screen is not None:
+        lammps_args["screen"] = screen
 
     for i in range(count):
         if verbosity in (1,2):
-            log_print(f"Working on sample {i + 1:d}/{count:d}.")
+            defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
         elif verbosity > 2:
-            log_print(
+            defexp.log_print(
                     f"Working on sample {i + 1:d}/{count:d}: "
                     f"{alt[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
 
@@ -41,7 +49,7 @@ def random_energy_loss(
                 atom_type, aind, unitv[i], energies[i], df_name, lammps_args,
                 tf_name, pid, **kwargs)
 
-        with open(eloss_fname, "a") as f:
+        with open(result_fname, "a") as f:
             if verbosity > 1:
                 logging.debug(f"Opened file {result_fname} in append mode.")
             f.write(
@@ -49,16 +57,17 @@ def random_energy_loss(
                     f"{depot:.16e} {int(frenkel_defect)}\n")
 
         if verbosity > 1:
-            logging.debug(f"Wrote to file {eloss_fname}.")
+            logging.debug(f"Wrote to file {result_fname}.")
 
 
 def execute(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, aind: int, pid: int, parallel: bool,
+    emin: float, emax: float, aind: int, pid: int, parallel: bool = False,
     unique_seeds: bool = True, **kwargs
 ):
     if parallel:
         processes = []
+        ainds = simulation.lattice.indices_in_central_cell(lammps=False)
         for i, aind, atom_type in enumerate(zip(ainds, atom_types)):
             process_seed = abs(hash((seed, i))) if unique_seeds else seed
             args = (recoil_simulation, process_seed, count, emin, emax, aind, i)
@@ -67,7 +76,7 @@ def execute(
         for p in processes: p.join()
     else:
         process_seed = abs(hash((seed, pid))) if unique_seeds else seed
-        random_angle_thresholds(
+        random_energy_loss(
                 recoil_simulation, process_seed, count, emin, emax, aind, pid, **kwargs)
 
 
@@ -81,7 +90,7 @@ if __name__ == "__main__":
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
     parser.add_argument("-b", "--binary", type=str, default=None)
-    parser.add_argument("-c", "--configpath", type=str, default=defexp.default_config_path())
+    parser.add_argument("-c", "--configpath", type=str, default=".")
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
@@ -118,10 +127,10 @@ if __name__ == "__main__":
     thermo_dir = f"{args.work_dir}/thermo"
     log_dir = f"{args.work_dir}/logs"
 
-    material = materials.load_material(f"{args.configpath}/materials", args.material)
-    sim_info = defexp.load_sim_info(f"{args.configpath}/simulations", args.material)
+    material = defexp.load_material(f"{args.configpath}/materials", f"{args.configpath}/potentials", args.material)
+    sim_info = defexp.load_sim_info(f"{args.configpath}/sim_info", args.material)
 
-    lattice = material.lattice(sim_info["repeat"])
+    lattice = defexp.Lattice(material, sim_info["repeat"])
 
     label = f"eloss_{material.label}"
     exp_io = defexp.ExperimentIO(
