@@ -1,6 +1,6 @@
-units		    metal
-atom_style	    ${ASTYLE}
-boundary	    p p p
+units           metal
+atom_style      ${ASTYLE}
+boundary        p p p
 
 read_data       ${INDNAME}
 
@@ -8,33 +8,26 @@ include         ${MFNAME}
 
 include         ${PFNAME}
 
-timestep	    ${DT}
-#fix		       MYDT    all     dt/reset 5 NULL 0.0005 0.01 emax 30 units box
+timestep        ${DT}
+#fix               MYDT    all     dt/reset 5 NULL 0.0005 0.01 emax 30 units box
 
-neighbor	    0.8 bin
-neigh_modify	every 10 delay 0 check yes
+neighbor        0.8 bin
+neigh_modify    every 10 delay 0 check yes
 
-#include         atomgroups.lammpsin
+compute         EPA     all     pe/atom
+compute         EKA     all     ke/atom
 
-compute		    epa     all     pe/atom
-compute		    eka     all     ke/atom
+compute         EP      all     pe
 
-compute         ep      all     pe
-
-# Dump every 20 steps
-#dump		    MYDUMP  all &
-#        custom 10 /mnt/c/Users/w10ac/Desktop/${DNAME}/*.dump id type x y z c_epa c_eka vx vy vz
-#dump_modify     MYDUMP pad 8
-
-thermo		    10
-thermo_style	custom  step&
+thermo          10
+thermo_style    custom  step&
         time dt temp pe etotal press vol pxx pyy pzz lx ly lz
-thermo_modify 	line one flush yes format 1 "ec %8lu" format float "%15.10g"
+thermo_modify   line one flush yes format 1 "ec %8lu" format float "%15.10g"
 
 # Set temperature and run with pressure control
-velocity	    all     create  ${T} 1254623 rot yes mom yes dist gaussian
+velocity        all     create  ${T} 1254623 rot yes mom yes dist gaussian
 fix             MYNPT   all     npt temp ${T} ${T} 0.2 aniso 0.0 0.0 1.0
-run		        ${STEP}
+run             ${STEP}
 unfix           MYNPT
 
 write_data      ${OUTDNAME}

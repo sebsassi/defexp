@@ -10,15 +10,53 @@ import numpy as np
 import defexp
 
 
+def random_directions(rng, central_dir: tuple[float], max_dev: float, count: int):
+    sinpa = np.sin(central_dir[0])
+    cospa = np.cos(central_dir[0])
+    sinaz = np.sin(central_dir[1])
+    cosaz = np.cos(central_dir[1])
+
+    z = np.array([sinpa*cosaz, sinpa*sinaz, cospa])
+    y = np.array([cospa*cosaz, cospa*sinaz, -sinpa])
+    x = np.array([sinaz, -cosaz, 0.0])
+
+    cosmin = np.cos(max_dev)
+    umin = 0.5*(1.0 + cosmin)
+
+    cosdev = cosmin + 2.0*(1.0 - umin)*rng.random(count)
+    sindev = np.sqrt((1.0 - cosdev)*(1.0 + cosdev))
+    rot = 2.0*np.pi*rng.random(count)
+    cosrot = np.cos(rot)
+    sinrot = np.sin(rot)
+
+    dir = z*cosdev + y*sindev*sinrot + x*sindev*cosrot
+    pa = np.arccos(dir[2])
+    az = np.atan2(dir[1], dir[0])
+
+    return pa, az, dir
+
+
 def random_energy_loss(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, aind: int, pid: int,
+    direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     screen: typing.Optional[str] = None, verbosity: int = 1, **kwargs
 ):
     rng = np.random.default_rng(seed)
-    alt, az = defexp.uniform_angles(rng, count)
-    energies = emin + (emax - emin)*rng.random(count)
-    unitv = defexp.angles_to_vec(alt, az)
+
+    if direction == (0.0, 0.0) and angle == np.pi:
+        pa, az = defexp.uniform_angles(rng, count)
+    elif angle == 0.0:
+        pa, az = direction
+        unitv = defexp.angles_to_vec(pa, az)
+    else:
+        pa, az, unitv = random_directions(rng, central_dir, max_angle, count)
+
+
+    if emin == emax:
+        energies = emin*np.ones(count)
+    else:
+        energies = emin + (emax - emin)*rng.random(count)
 
     atom_type = recoil_simulation.lattice.atoms.numbers[aind]
 
@@ -43,7 +81,7 @@ def random_energy_loss(
         elif verbosity > 2:
             defexp.log_print(
                     f"Working on sample {i + 1:d}/{count:d}: "
-                    f"{alt[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
+                    f"{pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
 
         depot, frenkel_defect = recoil_simulation.run(
                 atom_type, aind, unitv[i], energies[i], df_name, lammps_args,
@@ -53,7 +91,7 @@ def random_energy_loss(
             if verbosity > 1:
                 logging.debug(f"Opened file {result_fname} in append mode.")
             f.write(
-                    f"{alt[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
+                    f"{pa[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
                     f"{depot:.16e} {int(frenkel_defect)}\n")
 
         if verbosity > 1:
@@ -63,6 +101,7 @@ def random_energy_loss(
 def execute(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, aind: int, pid: int, parallel: bool = False,
+    direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     unique_seeds: bool = True, **kwargs
 ):
     if parallel:
@@ -80,8 +119,13 @@ def execute(
                 recoil_simulation, process_seed, count, emin, emax, aind, pid, **kwargs)
 
 
+def angle_pair(arg: str):
+    pair = arg.split(",")
+    return float(pair[0]), float(pair[1])
+
+
 if __name__ == "__main__":
-    print("Running thresholds.py")
+    print("Running eloss.py")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material label")
@@ -94,6 +138,9 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
+    parser.add_argument("--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
+    parser.add_argument("--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
+    parser.add_argument("--dump", action="store_true" help="make periodic dumps of simulation state")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -110,6 +157,9 @@ if __name__ == "__main__":
     logging.info(f"Result directory: {args.res_dir}")
     logging.info(f"Work directory: {args.work_dir}")
     logging.info(f"Zero non-Frenkel: {args.zero_nonfrenkel}")
+    logging.info(f"Direction: {args.direction}")
+    logging.info(f"Maximum angle: {args.max_angle}")
+    logging.info(f"Dump: {args.dump}")
 
     if args.binary is not None:
         lammps_binary = args.binary
@@ -138,7 +188,7 @@ if __name__ == "__main__":
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RecoilSimulation(
-            lammps_binary, lattice, exp_io, lammps_io, dump=False,
+            lammps_binary, lattice, exp_io, lammps_io, dump=args.dump,
             time_lammps=True, timestep=sim_info["timestep"], 
             duration=sim_info["impact_duration"],
             temperature=sim_info["temperature"])
@@ -149,5 +199,5 @@ if __name__ == "__main__":
 
     execute(
             simulation, args.seed, args.count, sim_info["emin"], sim_info["emax"],
-            atom_index, args.i, unique_seeds=True, test_frenkel=True, smooth_count=10,
-            zero_nonfrenkel=args.zero_nonfrenkel)
+            atom_index, args.i, direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
+            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel)

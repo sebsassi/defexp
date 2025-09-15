@@ -385,23 +385,23 @@ def uniform_angles(
     Returns
     -------
     numpy.ndarray
-        Altitude angles.
+        Polar angles.
     numpy.ndarray
         Azimuth angles.
     """
-    altitude = np.arccos(2*rng.random(count) - 1)
-    azimuth = (2*np.pi)*rng.random(count)
-    return altitude, azimuth
+    pa = np.arccos(2*rng.random(count) - 1)
+    az = (2*np.pi)*rng.random(count)
+    return pa, az
 
 
-def angles_to_vec(alt: np.ndarray, az: np.ndarray) -> np.ndarray:
+def angles_to_vec(pa: np.ndarray, az: np.ndarray) -> np.ndarray:
     """
     Transform pair of spherical angles to vector.
 
     Parameters
     ----------
-    alt : numpy.ndarray
-        Altitude angle.
+    pa : numpy.ndarray
+        Polar angle.
     az : numpy.ndarray
         Azimuthal angle.
 
@@ -410,7 +410,7 @@ def angles_to_vec(alt: np.ndarray, az: np.ndarray) -> np.ndarray:
     numpy.ndarray
     """
     return np.stack(
-            (np.sin(alt)*np.cos(az), np.sin(alt)*np.sin(az), np.cos(alt)),
+            (np.sin(pa)*np.cos(az), np.sin(pa)*np.sin(az), np.cos(pa)),
             axis=-1)
 
 
@@ -1104,8 +1104,8 @@ class RecoilSimulation:
         # IO
         self.io = io
         self.lammps_io = lammps_io
-        self._dump = dump
-        if dump:
+        self.dump = dump
+        if self.dump:
             self.io.empty_dump_dir()
 
         # LAMMPS
@@ -1159,7 +1159,7 @@ class RecoilSimulation:
             "OUTDNAME": f"{df_name}",
             "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
             "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}",
-            "DUMP": int(self._dump),
+            "DUMP": int(self.dump),
             "DUMPINT": dumpint,
             "DUMPDIR": f"{self.lammps_io.dump_dir}",
             "T": self.temperature,

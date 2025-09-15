@@ -27,14 +27,6 @@ if __name__ == "__main__":
     logging.info(f"Energy: {args.energy:.5e}")
     logging.info(f"Config path: {args.configpath}")
 
-    config_fname = f"{args.configpath}/{args.material}_config.json"
-    with open(config_fname,"r") as f:
-        config = json.load(f)
-        if config["material"] != args.material:
-            raise ValueError(
-                    "Material in config file differs from argument material. "
-                    f"Is {config_fname} the desired config file?")
-
     if args.binary is not None:
         lammps_binary = args.binary
     else:
@@ -45,34 +37,38 @@ if __name__ == "__main__":
                 "binary in the relevant command line argument or set the "
                 "environment variable LMP_BINARY.")
 
-    proj = os.getenv("PROJ", default=".")
-    resdir = "/".join((proj, "thresholds", args.material))
-    dumpdir = os.getenv("DUMP_DIR", default="dump")
+    res_dir = f"{args.res_dir}/eloss/{args.material}"
+    lmp_dir = f"{args.work_dir}/lammps_work"
+    dump_dir = f"{args.work_dir}/dump"
+    thermo_dir = f"{args.work_dir}/thermo"
+    log_dir = f"{args.work_dir}/logs"
 
-    if "pot_file" in config:
-        material = construct(args.material, pot_file=config["pot_file"])
-    else:
-        material = construct(args.material)
+    material = defexp.load_material(f"{args.configpath}/materials", f"{args.configpath}/potentials", args.material)
+    sim_info = defexp.load_sim_info(f"{args.configpath}/sim_info", args.material)
 
-    energies = np.array([args.energy])*1.0e-9
+    lattice = defexp.Lattice(material, sim_info["repeat"])
 
-    ainds = material.indices_in_central_cell(lammps=False)
-    
-    io = defexp.ExperimentIO(material.label, res_dir=resdir, dump_dir=dumpdir)
+    label = f"eloss_{material.label}"
+    exp_io = defexp.ExperimentIO(
+            label, res_dir, thermo_dir, log_dir, save_thermo=["Time", "PotEng"])
+    lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
+
+    simulation = defexp.RecoilSimulation(
+            lammps_binary, lattice, exp_io, lammps_io, dump=True,
+            time_lammps=True, timestep=sim_info["timestep"], 
+            duration=sim_info["impact_duration"],
+            temperature=sim_info["temperature"])
+
+    ainds = lattice.indices_in_central_cell(lammps=False)
+    atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
+    logging.info(f"Atom index: {atom_index}")
 
     print(ainds)
     if args.relax:
-        defexp.RelaxExperiment(lammps_binary, material, io).run()
+        defexp.RelaxSimulation(
+            lammps_binary, lattice, lammps_io, time_lammps=True,
+            timestep=sim_info["timestep"], duration=sim_info["impact_duration"],
+            temperature=sim_info["temperature"]).run(verbosity=2)
 
-    experiment = defexp.DefectExperiment(
-            lammps_binary, material, io, dump=True,
-            verbosity=2, screen="", 
-            time_lammps=True, timestep=config["timestep"], 
-            duration=config["impact_duration"],
-            temperature=config["temperature"])
-
-    extra_label = f"{1000*config['timestep']:.2f}_{config['impact_duration']:.1f}_dump_{args.energy:.0f}"
+    extra_label = f"{1000*sim_info['timestep']:.2f}_{sim_info['impact_duration']:.1f}_dump_{args.energy:.0f}"
     atom_type = material.lattice.numbers[args.aind]
-    experiment.scan_energy_range(
-            atom_type, args.aind, defexp.angles_to_vec(args.alt, args.az),
-            energies, extra_label, test_frenkel=False)
