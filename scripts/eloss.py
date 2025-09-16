@@ -1,3 +1,4 @@
+import time
 import datetime
 import argparse
 import json
@@ -114,15 +115,13 @@ def execute(
         for p in processes: p.start()
         for p in processes: p.join()
     else:
-        process_seed = abs(hash((seed, pid))) if unique_seeds else seed
         random_energy_loss(
-                recoil_simulation, process_seed, count, emin, emax, aind, pid, **kwargs)
+                recoil_simulation, seed, count, emin, emax, aind, pid, **kwargs)
 
 
 def angle_pair(arg: str):
     pair = arg.split(",")
     return float(pair[0]), float(pair[1])
-
 
 if __name__ == "__main__":
     print("Running eloss.py")
@@ -134,7 +133,7 @@ if __name__ == "__main__":
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
     parser.add_argument("-b", "--binary", type=str, default=None)
-    parser.add_argument("-c", "--configpath", type=str, default=".")
+    parser.add_argument("-c", "--config-dir", type=str, default=".")
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
@@ -143,17 +142,20 @@ if __name__ == "__main__":
     parser.add_argument("--dump", action="store_true" help="make periodic dumps of simulation state")
     args = parser.parse_args()
 
+    timestamp = int(time.time())
+    seed = abs(hash((args.seed, args.jid, args.i, timestamp)))
+
     logging.basicConfig(
             filename=f"thresholds_{args.material}_{args.jid:d}_{args.i:d}_{args.seed:d}_{args.count:d}.log",
             level=logging.DEBUG)
-    logging.info(f"Date: {datetime.date.today()}")
+    logging.info(f"Date: {datetime.date.fromtimestamp(timestamp)}")
     logging.info(f"Material: {args.material}")
     logging.info(f"Job ID: {args.jid}")
     logging.info(f"Index: {args.i}")
     logging.info(f"Input seed: {args.seed}")
-    logging.info(f"True seed: {args.seed}")
+    logging.info(f"True seed: {seed}")
     logging.info(f"Count: {args.count}")
-    logging.info(f"Config path: {args.configpath}")
+    logging.info(f"Config path: {args.config_dir}")
     logging.info(f"Result directory: {args.res_dir}")
     logging.info(f"Work directory: {args.work_dir}")
     logging.info(f"Zero non-Frenkel: {args.zero_nonfrenkel}")
@@ -177,8 +179,8 @@ if __name__ == "__main__":
     thermo_dir = f"{args.work_dir}/thermo"
     log_dir = f"{args.work_dir}/logs"
 
-    material = defexp.load_material(f"{args.configpath}/materials", f"{args.configpath}/potentials", args.material)
-    sim_info = defexp.load_sim_info(f"{args.configpath}/sim_info", args.material)
+    material = defexp.load_material(f"{args.config_dir}/materials", f"{args.config_dir}/potentials", args.material)
+    sim_info = defexp.load_sim_info(f"{args.config_dir}/sim_info", args.material)
 
     lattice = defexp.Lattice(material, sim_info["repeat"])
 
@@ -198,6 +200,6 @@ if __name__ == "__main__":
     logging.info(f"Atom index: {atom_index}")
 
     execute(
-            simulation, args.seed, args.count, sim_info["emin"], sim_info["emax"],
+            simulation, seed, args.count, sim_info["emin"], sim_info["emax"],
             atom_index, args.i, direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel)

@@ -692,6 +692,13 @@ class ExperimentIO:
     ):
         self.label = label
 
+        if not os.path.isdir(res_dir):
+            raise FileNotFoundError(f"{res_dir} is not directory")
+        if not os.path.isdir(thermo_dir):
+            raise FileNotFoundError(f"{thermo_dir} is not directory")
+        if not os.path.isdir(log_dir):
+            raise FileNotFoundError(f"{log_dir} is not directory")
+
         self.res_dir = res_dir
         self.thermo_dir = thermo_dir
         self.log_dir = log_dir
@@ -699,16 +706,6 @@ class ExperimentIO:
         self.save_thermo = save_thermo
 
         self.make_dirs()
-
-
-    def make_dirs(self):
-        """
-        Checks if directories for output data exists and creates them if they
-        do not.
-        """
-        if not os.path.isdir(self.res_dir): os.makedirs(self.res_dir)
-        if not os.path.isdir(self.thermo_dir): os.mkdir(self.thermo_dir)
-        if not os.path.isdir(self.log_dir): os.mkdir(self.log_dir)
 
 
     def log_file_name(self, pid: int):
@@ -767,21 +764,14 @@ class LAMMPSIO:
     def __init__(self, experiment_label: str, work_dir: str, dump_dir: str):
         self.label = experiment_label
 
+        if not os.path.isdir(work_dir):
+            raise FileNotFoundError(f"{work_dir} is not directory")
+        if not os.path.isdir(dump_dir):
+            raise FileNotFoundError(f"{dump_dir} is not directory")
+
         self.script_dir = f"{os.path.dirname(os.path.dirname(__file__))}/lammpsin"
         self.work_dir = work_dir
         self.dump_dir = dump_dir
-
-        self.make_dirs()
-
-
-    def make_dirs(self):
-        """
-        Checks if directories for output data exists and creates them if they
-        do not.
-        """
-        if not os.path.isdir(self.work_dir): os.mkdir(self.work_dir)
-        if self.dump_dir is not None:
-            if not os.path.isdir(self.dump_dir): os.mkdir(self.dump_dir)
 
 
     def empty_dump_dir(self):
