@@ -127,13 +127,13 @@ if __name__ == "__main__":
     print("Running eloss.py")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("material", type=str, help="material label")
+    parser.add_argument("material", type=str, help="material name")
     parser.add_argument("jid", type=int, help="job ID")
     parser.add_argument("i", type=int, help="index of recoil atom")
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
-    parser.add_argument("-b", "--binary", type=str, default=None)
-    parser.add_argument("-c", "--config-dir", type=str, default=".")
+    parser.add_argument("-b", "--lmp-binary", type=str, default=None, help="name of the LAMMPS binary")
+    parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
@@ -163,11 +163,11 @@ if __name__ == "__main__":
     logging.info(f"Maximum angle: {args.max_angle}")
     logging.info(f"Dump: {args.dump}")
 
-    if args.binary is not None:
-        lammps_binary = args.binary
+    if args.lmp_binary is not None:
+        lmp_binary = args.lmp_binary
     else:
-        lammps_binary = os.getenv("LMP_BINARY", default=None)
-    if lammps_binary is None:
+        lmp_binary = os.getenv("LMP_BINARY", default=None)
+    if lmp_binary is None:
         raise RuntimeError(
                 "Missing LAMMPS binary. Either provide name of the LAMMPS "
                 "binary in the relevant command line argument or set the "
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RecoilSimulation(
-            lammps_binary, lattice, exp_io, lammps_io, dump=args.dump,
+            lmp_binary, lattice, exp_io, lammps_io, dump=args.dump,
             time_lammps=True, timestep=sim_info["timestep"], 
             duration=sim_info["impact_duration"],
             temperature=sim_info["temperature"])
