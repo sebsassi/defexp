@@ -29,7 +29,7 @@ Activate the virtual environment with
 source venv/bin/activate
 ```
 Once in the virtual environment, navigate to the directory and install the main
-package with pip
+package with `pip`
 ```sh
 cd defexp
 pip install -e .
