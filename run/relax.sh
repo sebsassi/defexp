@@ -1,0 +1,93 @@
+#!/bin/bash
+#SBATCH -M kale
+#SBATCH -t 04:00
+#SBATCH --mem-per-cpu=60
+#SBATCH --error="relax-%j.err"
+#SBATCH --output="relax-%j.out"
+
+SIMULATION=$1
+MATERIAL=$2
+
+MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
+if [ ! -d "$MD_WORKDIR" ]; then
+    mkdir -p $MD_WORKDIR
+    if [ $? -ne 0 ]; then
+        echo "Could not create directory $MD_WORKDIR."
+    fi
+fi
+
+mkdir -p "$MD_WORKDIR/lammps_work"
+if [ $? -ne 0 ]; then
+    echo "Could not create directory $MD_WORKDIR/lammps_work."
+    exit 1
+fi
+
+mkdir -p "$MD_WORKDIR/dump"
+if [ $? -ne 0 ]; then
+    echo "Could not create directory $MD_WORKDIR/dump."
+    exit 1
+fi
+
+mkdir -p "$MD_WORKDIR/thermo"
+if [ $? -ne 0 ]; then
+    echo "Could not create directory $MD_WORKDIR/thermo."
+    exit 1
+fi
+
+mkdir -p "$MD_WORKDIR/logs"
+if [ $? -ne 0 ]; then
+    echo "Could not create directory $MD_WORKDIR/logs."
+    exit 1
+fi
+
+mkdir -p "$MD_WORKDIR/$SIMULATION/$MATERIAL"
+if [ $? -ne 0 ]; then
+    echo "Could not create directory $MD_WORKDIR/$SIMULATION/$MATERIAL."
+    exit 1
+fi
+
+cd $MD_WORKDIR
+
+if [ $? -ne 0 ]; then
+    echo "Could not change directory to $MD_WORKDIR."
+    exit 1
+fi
+
+module purge
+if [ $? -eq 0 ]; then
+    echo "Modules unloaded successfully."
+else
+    echo "Failed to unload modules."
+    exit 1
+fi
+
+module load Python
+if [ $? -ne 0 ]; then
+    echo "Module Python loaded successfully."
+else
+    echo "Failed to load Python."
+    exit 1
+fi
+
+if [ ! -d "$PROJ/mdsim/venv" ]; then
+    echo "Virtual environment does not exist."
+    exit 1
+fi
+
+source "$PROJ/mdsim/venv/bin/activate"
+if [ $? -ne 0 ]; then
+    echo "Failed to source virtual environment."
+
+module load LAMMPS
+if [ $? -eq 0 ]; then
+    echo "Module LAMMPS loaded successfully."
+else
+    echo "Failed to load LAMMPS."
+    exit 1
+fi
+
+srun python relax.py "$MATERIAL" --binary lmp --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR"
+
+deactivate
+
+exit 0
