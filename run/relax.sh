@@ -3,7 +3,7 @@
 #SBATCH -t 04:00
 #SBATCH --mem-per-cpu=60
 #SBATCH --error="/home/%u/relax-%j.err"
-#SBATCH --output="<F2>home/%u/relax-%j.out"
+#SBATCH --output="/home/%u/relax-%j.out"
 
 SIMULATION=$1
 MATERIAL=$2
