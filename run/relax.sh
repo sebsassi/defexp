@@ -2,8 +2,8 @@
 #SBATCH -M kale
 #SBATCH -t 04:00
 #SBATCH --mem-per-cpu=60
-#SBATCH --error="relax-%j.err"
-#SBATCH --output="relax-%j.out"
+#SBATCH --error="/home/%u/relax-%j.err"
+#SBATCH --output="<F2>home/%u/relax-%j.out"
 
 SIMULATION=$1
 MATERIAL=$2
