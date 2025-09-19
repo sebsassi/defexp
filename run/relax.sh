@@ -10,40 +10,11 @@ MATERIAL=$2
 
 MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
 if [ ! -d "$MD_WORKDIR" ]; then
-    mkdir -p $MD_WORKDIR
+    mkdir  $MD_WORKDIR
     if [ $? -ne 0 ]; then
         echo "Could not create directory $MD_WORKDIR."
+        exit 1
     fi
-fi
-
-mkdir -p "$MD_WORKDIR/lammps_work"
-if [ $? -ne 0 ]; then
-    echo "Could not create directory $MD_WORKDIR/lammps_work."
-    exit 1
-fi
-
-mkdir -p "$MD_WORKDIR/dump"
-if [ $? -ne 0 ]; then
-    echo "Could not create directory $MD_WORKDIR/dump."
-    exit 1
-fi
-
-mkdir -p "$MD_WORKDIR/thermo"
-if [ $? -ne 0 ]; then
-    echo "Could not create directory $MD_WORKDIR/thermo."
-    exit 1
-fi
-
-mkdir -p "$MD_WORKDIR/logs"
-if [ $? -ne 0 ]; then
-    echo "Could not create directory $MD_WORKDIR/logs."
-    exit 1
-fi
-
-mkdir -p "$MD_WORKDIR/$SIMULATION/$MATERIAL"
-if [ $? -ne 0 ]; then
-    echo "Could not create directory $MD_WORKDIR/$SIMULATION/$MATERIAL."
-    exit 1
 fi
 
 cd $MD_WORKDIR
