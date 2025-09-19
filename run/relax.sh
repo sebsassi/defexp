@@ -59,7 +59,7 @@ else
     exit 1
 fi
 
-srun python relax.py "$MATERIAL" --binary lmp --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR"
+srun python "$PROJ/mdsim/defexp/scripts/relax.py" "$MATERIAL" --binary lmp --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR"
 
 deactivate
 
