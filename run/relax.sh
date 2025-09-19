@@ -33,7 +33,7 @@ else
 fi
 
 module load Python
-if [ $? -ne 0 ]; then
+if [ $? -eq 0 ]; then
     echo "Module Python loaded successfully."
 else
     echo "Failed to load Python."
@@ -48,6 +48,8 @@ fi
 source "$PROJ/mdsim/venv/bin/activate"
 if [ $? -ne 0 ]; then
     echo "Failed to source virtual environment."
+    exit 1
+fi
 
 module load LAMMPS
 if [ $? -eq 0 ]; then
