@@ -76,16 +76,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-module load LAMMPS
-if [ $? -eq 0 ]; then
-    echo "Module LAMMPS loaded successfully."
-else
-    echo "Failed to load LAMMPS."
-    exit 1
-fi
-
 srun python "$PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$COUNT" \
-    --binary lmp --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR/eloss/$MATERIAL"
+    --binary "$LMP_BINARY" --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR/eloss/$MATERIAL"
 
 deactivate
 
