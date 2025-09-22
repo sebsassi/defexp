@@ -1,0 +1,95 @@
+units           metal
+
+# The notation ${VAR} is a referenec to a variable named VAR. Variables are
+# either declared in the script, or implicitly from command line arguments.
+# In this file most variables are intended to be read from the command line.
+
+# `atom_style` determines what type of data is associated with atoms.
+atom_style      ${ASTYLE}
+
+# Periodic boundary conditons in all directions.
+boundary        p p p
+
+# This data file contains the size of the simulation region, and IDs, types,
+# and initial positions of the atoms.
+read_data       ${INDNAME}
+
+# LAMMPS script files can be included in other LAMMPS script files. Here MFNAME
+# refers to a file that contains the masses of the simulated atoms, and PFNAME
+# is a file containing information about the interatomic potential model.
+include         ${MFNAME}
+include         ${PFNAME}
+
+# Time step is expressed in picoseconds in metal units. Typically has to be
+# below 0.001 for defect simulations.
+timestep        ${DT}
+
+#if ${DTRESET} then &
+#    fix         MYDT    all     dt/reset 10 ${DT} ${DT} 0.01 emax 30 units box
+
+neighbor        0.8 bin
+neigh_modify    every 10 delay 0 check yes
+
+# Here we define a group called RECOIL, consisting of a single atom, the
+# recoiling nucleus. CAI is the ID of the recoil atom, as defined in the data
+# file we read in.
+group           RECOIL id ${CAI}
+
+# Because we can only simulate a few thousand atoms, we need to do tricks to
+# make the simulation behave as if it was part of a larger lattice of atoms. So
+# we define a border region, and later in the script we put a thermostat on
+# this region to simulate dissipation of excess thermal energy into the
+# surroundings.
+region          BORDER      block                                               &
+        ${BXMIN} ${BXMAX} ${BYMIN} ${BYMAX} ${BZMIN} ${BZMAX} side out
+region          INTERIOR    block                                               &
+        ${BXMIN} ${BXMAX} ${BYMIN} ${BYMAX} ${BZMIN} ${BZMAX}
+group           BORDER_ATOMS    region BORDER
+group           INTERIOR_ATOMS  region INTERIOR
+
+# Compute potential and kinetic energies of all atoms.
+compute         EPA     all     pe/atom
+compute         EKA     all     ke/atom
+
+# The total potential energy of the system is what we are interested in,
+# because it's a proxy for crystal defect formation.
+compute         EP      all     pe
+
+# We can dump the current state of the simulation every now and then, e.g. to
+# make animations of the simulation. Here if DUMP is TRUE we dump data every
+# DUMPINT steps.
+#
+# Because the scripting language is very rudimentary, the commands following an
+# if statement need to be in quotes, and on the same line ("&" denotes line
+# continuation).
+if ${DUMP} then                                                                 &
+    "dump           MYDUMP  all custom/gz ${DUMPINT} ${DUMPDIR}/*.dump.gz id"   &
+    "type x y z c_epa c_eka vx vy vz"                                           &
+    "dump_modify     MYDUMP pad 8"
+
+# We also print thermodynamic data every few time steps. Some of this is for
+# debugging purposes, e.g., to see that the size of the simulation box hasn't
+# suddenly blown up. But also print data we want to analyze after the
+# simulation, like the potential energy.
+thermo          10
+thermo_style    custom  step                                                    &
+        time dt temp pe etotal press vol pxx pyy pzz lx ly lz
+thermo_modify   line one flush yes format 1 "ec %8lu" format float "%15.10g"
+
+# We set the atoms to a target temperature T and run with pressure control for
+# ISTEP steps.
+velocity        all     create  ${T} ${SEED} rot yes mom yes dist gaussian
+fix             MYNPT   all     npt temp ${T} ${T} $(100.0*dt) aniso 0.0 0.0 1.0
+run             ${ISTEP}
+unfix           MYNPT
+
+# We give the recoil atom an itial velocity. We also set the cooling of the
+# border region, and ensure energy conservation in the interior region. Then
+# we run for STEP steps.
+velocity        RECOIL      set ${VELX} ${VELY} ${VELZ} sum no units box
+fix             CHILL       BORDER_ATOMS nvt temp ${T} ${T} $(100.0*dt)
+fix             CONSERVE    INTERIOR_ATOMS nve
+run             ${STEP}
+
+# Finally we write out the final state of the simulation for further analysis.
+write_data      ${OUTDNAME}

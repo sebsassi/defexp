@@ -1,0 +1,33 @@
+units           metal
+atom_style      ${ASTYLE}
+boundary        p p p
+
+read_data       ${INDNAME}
+
+include         ${MFNAME}
+
+include         ${PFNAME}
+
+timestep        ${DT}
+#fix               MYDT    all     dt/reset 5 NULL 0.0005 0.01 emax 30 units box
+
+neighbor        0.8 bin
+neigh_modify    every 10 delay 0 check yes
+
+compute         EPA     all     pe/atom
+compute         EKA     all     ke/atom
+
+compute         EP      all     pe
+
+thermo          10
+thermo_style    custom  step&
+        time dt temp pe etotal press vol pxx pyy pzz lx ly lz
+thermo_modify   line one flush yes format 1 "ec %8lu" format float "%15.10g"
+
+# Set temperature and run with pressure control
+velocity        all     create  ${T} 1254623 rot yes mom yes dist gaussian
+fix             MYNPT   all     npt temp ${T} ${T} 0.2 aniso 0.0 0.0 1.0
+run             ${STEP}
+unfix           MYNPT
+
+write_data      ${OUTDNAME}

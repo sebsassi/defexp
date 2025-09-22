@@ -13,4 +13,7 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["defexp"]
+packages = ["defexp", "defexp.lammpsin"]
+
+[tool.setuptools.package-data]
+"defexp.lammpsin" = ["*.lammpsin"]
