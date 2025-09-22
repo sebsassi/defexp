@@ -47,6 +47,7 @@ if __name__ == "__main__":
     lattice = defexp.Lattice(material, sim_info["repeat"])
 
     label = f"relax_{material.label}"
+    exp_io = defexp.ExperimentIO( label, res_dir, thermo_dir, log_dir)
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     exp_io.make_dirs()
