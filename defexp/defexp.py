@@ -693,19 +693,17 @@ class ExperimentIO:
         self.label = label
 
         if not os.path.isdir(res_dir):
-            raise FileNotFoundError(f"{res_dir} is not directory")
+            raise FileNotFoundError(f"{res_dir} is not a directory")
         if not os.path.isdir(thermo_dir):
-            raise FileNotFoundError(f"{thermo_dir} is not directory")
+            raise FileNotFoundError(f"{thermo_dir} is not a directory")
         if not os.path.isdir(log_dir):
-            raise FileNotFoundError(f"{log_dir} is not directory")
+            raise FileNotFoundError(f"{log_dir} is not a directory")
 
         self.res_dir = res_dir
         self.thermo_dir = thermo_dir
         self.log_dir = log_dir
 
         self.save_thermo = save_thermo
-
-        self.make_dirs()
 
 
     def log_file_name(self, pid: int):
@@ -765,9 +763,9 @@ class LAMMPSIO:
         self.label = experiment_label
 
         if not os.path.isdir(work_dir):
-            raise FileNotFoundError(f"{work_dir} is not directory")
+            raise FileNotFoundError(f"{work_dir} is not a directory")
         if not os.path.isdir(dump_dir):
-            raise FileNotFoundError(f"{dump_dir} is not directory")
+            raise FileNotFoundError(f"{dump_dir} is not a directory")
 
         self.script_dir = f"{os.path.dirname(os.path.dirname(__file__))}/lammpsin"
         self.work_dir = work_dir
