@@ -767,7 +767,7 @@ class LAMMPSIO:
         if not os.path.isdir(dump_dir):
             raise FileNotFoundError(f"{dump_dir} is not a directory")
 
-        self.script_dir = f"{os.path.dirname(os.path.dirname(__file__))}/lammpsin"
+        self.script_dir = f"{os.path.dirname(__file__)}/lammpsin"
         self.work_dir = work_dir
         self.dump_dir = dump_dir
 
