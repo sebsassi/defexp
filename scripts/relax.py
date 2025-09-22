@@ -35,6 +35,7 @@ if __name__ == "__main__":
 
     if not os.path.isdir(lmp_dir): os.mkdir(lmp_dir)
     if not os.path.isdir(dump_dir): os.mkdir(dump_dir)
+    if not os.path.isdir(os.path.dirname(res_dir)): os.mkdir(os.path.dirname(res_dir))
     if not os.path.isdir(res_dir): os.mkdir(res_dir)
     if not os.path.isdir(thermo_dir): os.mkdir(thermo_dir)
     if not os.path.isdir(log_dir): os.mkdir(log_dir)
