@@ -51,7 +51,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-srun python "$PROJ/mdsim/defexp/scripts/relax.py" "$MATERIAL" --lmp-binary "$LMP_BINARY" --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR"
+srun python "$PROJ/mdsim/defexp/scripts/relax.py" "$MATERIAL" \
+    --lmp-binary "$LMP_BINARY" --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR" --res-dir "$MD_WORKDIR/eloss/$MATERIAL"
 
 deactivate
 

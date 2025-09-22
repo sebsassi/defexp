@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material name")
     parser.add_argument("-b", "--lmp-binary", type=str, default=None, help="name of the LAMMPS binary")
+    parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     args = parser.parse_args()
