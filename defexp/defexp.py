@@ -1094,7 +1094,7 @@ class RecoilSimulation:
         self.lammps_io = lammps_io
         self.dump = dump
         if self.dump:
-            self.io.empty_dump_dir()
+            self.lammps_io.empty_dump_dir()
 
         # LAMMPS
         self.lammps_threads = lammps_threads

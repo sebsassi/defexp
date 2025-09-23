@@ -4,7 +4,7 @@ LAMMPS.
 ## Dependencies
 
 These scripts require [LAMMPS](https://docs.lammps.org/Install.html) to be
-installed with the KSPACE and MANYBODY packages. The
+installed with the COMPRESS, KSPACE, and MANYBODY packages. The
 [prebuilt executables](https://docs.lammps.org/Install_linux.html) should have
 these packages installed.
 

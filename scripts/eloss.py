@@ -45,16 +45,17 @@ def random_energy_loss(
 ):
     rng = np.random.default_rng(seed)
 
-    if direction == (0.0, 0.0) and angle == np.pi:
+    if direction == (0.0, 0.0) and max_angle == np.pi:
         pa, az = defexp.uniform_angles(rng, count)
-    elif angle == 0.0:
+        unitv = defexp.angles_to_vec(pa, az)
+    elif max_angle == 0.0:
         pa, az = direction
         unitv = defexp.angles_to_vec(pa, az)
     else:
         pa, az, unitv = random_directions(rng, central_dir, max_angle, count)
 
 
-    if emin == emax:
+    if emin >= emax:
         energies = emin*np.ones(count)
     else:
         energies = emin + (emax - emin)*rng.random(count)
@@ -139,7 +140,10 @@ if __name__ == "__main__":
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
     parser.add_argument("--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
     parser.add_argument("--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
-    parser.add_argument("--dump", action="store_true" help="make periodic dumps of simulation state")
+    parser.add_argument("--energy", type=float, default=None, help="fixed recoil energy")
+    parser.add_argument("--emin", type=float, default=None, help="minimum recoil energy")
+    parser.add_argument("--emax", type=float, default=None, help="maximum recoil energy")
+    parser.add_argument("--dump", action="store_true", help="make periodic dumps of simulation state")
     args = parser.parse_args()
 
     timestamp = int(time.time())
@@ -161,6 +165,9 @@ if __name__ == "__main__":
     logging.info(f"Zero non-Frenkel: {args.zero_nonfrenkel}")
     logging.info(f"Direction: {args.direction}")
     logging.info(f"Maximum angle: {args.max_angle}")
+    logging.info(f"Energy: {args.energy}")
+    logging.info(f"Minimum energy: {args.emin}")
+    logging.info(f"Maximum energy: {args.emax}")
     logging.info(f"Dump: {args.dump}")
 
     if args.lmp_binary is not None:
@@ -183,6 +190,13 @@ if __name__ == "__main__":
     sim_info = defexp.load_sim_info(f"{args.config_dir}/sim_info", args.material)
 
     lattice = defexp.Lattice(material, sim_info["repeat"])
+    
+    if args.energy is not None:
+        emin = args.energy
+        emax = args.energy
+    else:
+        emin = args.emin if args.emin is not None else sim_info["emin"]
+        emax = args.emax if args.emax is not None else sim_info["emax"]
 
     label = f"eloss_{material.label}"
     exp_io = defexp.ExperimentIO(
@@ -200,6 +214,6 @@ if __name__ == "__main__":
     logging.info(f"Atom index: {atom_index}")
 
     execute(
-            simulation, seed, args.count, sim_info["emin"], sim_info["emax"],
-            atom_index, args.i, direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
+            simulation, seed, args.count, emin, emax, atom_index, args.i,
+            direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel)

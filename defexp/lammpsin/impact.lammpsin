@@ -63,8 +63,8 @@ compute         EP      all     pe
 # if statement need to be in quotes, and on the same line ("&" denotes line
 # continuation).
 if ${DUMP} then                                                                 &
-    "dump           MYDUMP  all custom/gz ${DUMPINT} ${DUMPDIR}/*.dump.gz id"   &
-    "type x y z c_epa c_eka vx vy vz"                                           &
+    "dump           MYDUMP  all custom/gz ${DUMPINT} ${DUMPDIR}/*.dump.gz id    &
+    type x y z c_EPA c_EKA vx vy vz"                                            &
     "dump_modify     MYDUMP pad 8"
 
 # We also print thermodynamic data every few time steps. Some of this is for
