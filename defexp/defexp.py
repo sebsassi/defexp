@@ -18,6 +18,8 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as linalg
 
+import lammps
+
 import ase
 import ase.io.lammpsdata
 
@@ -989,10 +991,44 @@ class RelaxSimulation:
             "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
             "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}"
         }
-        run_lammps(
-            self.lammps_io.relax_script_path(), lammps_args,
-            relaxation_vars, threads=self.lammps_threads, binary=self.binary,
-            timer=self.time_lammps, verbosity=verbosity)
+
+        lmp = lammps.lammps()
+
+        lmp.cmd.units("metal")
+        lmp.cmd.atom_style("atomic")
+        lmp.cmd.boundary("p", "p", "p")
+
+        lmp.cmd.read_data(self.lammps_io.data_file_name(self.lattice, "default"))
+
+        self.lattice.material.set_masses(lmp)
+        self.lattice.material.set_pair(lmp)
+
+        lmp.cmd.timestep(self.timestep)
+
+        lmp.cmd.neighbor(0.8, "bin")
+        lmp.cmd.neigh_modify(every=10, delay=0, check=True)
+
+        lmp.cmd.compute("EPA", "all", "pe/atom")
+        lmp.cmd.compute("EKA", "all", "ke/atom")
+
+        lmp.cmd.compute("EP", "all", "pe")
+
+        lmp.cmd.thermo(10)
+        lmp.cmd.thermo_style("custom",
+                "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
+                "pxx", "pyy", "lx", "ly", "lz")
+        lmp.cmd.thermo_modify(line="one", flush=True,
+                "format", 1, "ec %8lu", "format", "float", "%15.10g")
+
+        lmp.cmd.velocity("all", "create", self.temperature, 1254623,
+                rot=True, mom=True, dist="gaussian")
+        lmp.cmd.fix("MYNPT", "all", "npt",
+                "temp", self.temperature, self.temperature, 100.0*self.timestep,
+                "aniso", 0.0, 0.0, 1.0)
+        lmp.cmd.run(20, post=False)
+        lmp.cmd.unfix("MYNPT")
+
+        lmp.cmd.write_data(self.lammps_io.data_file_name(self.lattice, "relaxed"))
 
 
 class RecoilSimulation:
@@ -1215,7 +1251,7 @@ class RecoilSimulation:
             simulation.
         test_frenkel : bool, optional
             If true, test for frenkel defects.
-        zero_nonfrenkel : bool, optional
+        zero_nonfrenkel : bool, Deprecated since version 23Jun2022.optional
             If true, change in potential energy is zeroed if no Frenkel defects
             are detected.
         smooth_count : int, optional
@@ -1234,15 +1270,88 @@ class RecoilSimulation:
         has_frenkel_defect : bool
             Boolean of whether a Frenkel defect was detected in the simulation.
         """
-        impact_vars = self.impact_vars(
-            aind, atom_type, energy, unitv, df_name, istep=20, seed=seed)
-        run_lammps(
-            self.lammps_io.impact_script_path(), lammps_args, 
-            impact_vars, self.lammps_threads, binary=self.binary,
-            timer=self.time_lammps)
 
-        impacted_atoms = read_lammps_data(df_name)
-        thermo_info = read_thermo_info(tf_name)
+        os.system(f"cp {self.lammps_io.data_file_name(self.lattice, "relaxed")} {df_name}")
+
+        lmp = lammps.lammps()
+
+        lmp.cmd.units("metal")
+        lmp.cmd.atom_style("atomic")
+        lmp.cmd.boundary("p", "p", "p")
+
+        lmp.cmd.read_data(df_name)
+
+        self.lattice.material.set_masses(lmp)
+        self.lattice.material.set_pair(lmp)
+
+        lmp.cmd.timestep(self.timestep)
+
+        lmp.cmd.neighbor(0.8, "bin")
+        lmp.cmd.neigh_modify(every=10, delay=0, check=True)
+
+        lmp.cmd.group("RECOIL", id=aind + 1)
+
+        lmp.cmd.region("BORDER", "block",
+                self.bbox[0,0], self.bbox[0,1],
+                self.bbox[1,0], self.bbox[1,1],
+                self.bbox[2,0], self.bbox[2,1],
+                side="out")
+
+        lmp.cmd.region("INTERIOR", "block",
+                self.bbox[0,0], self.bbox[0,1],
+                self.bbox[1,0], self.bbox[1,1],
+                self.bbox[2,0], self.bbox[2,1],
+                side="in")
+
+        lmp.cmd.group("BORDER_ATOMS", region="BORDER")
+        lmp.cmd.group("INTERIOR_ATOMS", region="INTERIOR")
+
+        lmp.cmd.compute("EPA", "all", "pe/atom")
+        lmp.cmd.compute("EKA", "all", "ke/atom")
+
+        lmp.cmd.compute("EP", "all", "pe")
+
+        if self.dump:
+            lmp.cmd.dump("MYDUMP", "all", "custom/gz",
+                    max(self.num_step//1000, 1),
+                    f"{self.lammps_io.dump_dir}/*.dump.gz",
+                    "id", "type", "x", "y", "z", "c_EPA", "c_EKA",
+                    "vx", "vy", "vz")
+            lmp.cmd.dump_modify("MYDUMP", pad=8)
+
+        lmp.cmd.thermo(10)
+        lmp.cmd.thermo_style("custom",
+                "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
+                "pxx", "pyy", "lx", "ly", "lz")
+        lmp.cmd.thermo_modify(line="one", flush=True,
+                "format", 1, "ec %8lu", "format", "float", "%15.10g")
+
+        lmp.cmd.velocity("all", "create", self.temperature, self.seed,
+                rot=True, mom=True, dist="gaussian")
+        lmp.cmd.fix("MYNPT", "all", "npt",
+                "temp", self.temperature, self.temperature, 100.0*self.timestep,
+                "aniso", 0.0, 0.0, 1.0)
+        lmp.cmd.run(20, post=False)
+        lmp.cmd.unfix("MYNPT")
+        thermo_info = {key: [value] for key, value in lmp.last_thermo().items()}
+
+        vel = velocity_from(
+            energy*1.0e-9,
+            self.lattice.material.atom_props[atom_type]["mass"]*0.93149410242,
+            unitv)
+        lmp.cmd.velocity("RECOIL", "set", vel[0], vel[1], vel[2], sum=False, units="box")
+        lmp.cmd.fix("CHILL", "BORDER_ATOMS", "nvt", 
+                "temp", self.temperature, self.temperature, 100.0*self.timestep)
+        lmp.cmd.fix("CONSERVE", "INTERIOR_ATOMS", "nve")
+
+        num_batch = self.num_step//10
+
+        for i in range(num_batch):
+            lmp.cmd.run(10, pre=False, post=False)
+            for key, value in lmp.last_thermo():
+                thermo_info[key].append(value)
+
+        positons = lmp.numpy.extract_atom("x")
 
         self.io.save_thermo_data(thermo_info, energy, unitv, aind, pid)
 
@@ -1250,7 +1359,7 @@ class RecoilSimulation:
         if test_frenkel:
             has_frenkel_defect = is_defect_frenkel(
                 self.relaxed_atoms.positions[self.frenkel_indices],
-                impacted_atoms.positions[self.frenkel_indices])
+                positions[self.frenkel_indices])
             if verbosity > 2:
                 log_print(
                     "Tested Frenkel defect. Frenkel defects:", has_frenkel_defect)
