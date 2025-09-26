@@ -56,130 +56,6 @@ def log_print(string: str, print_: bool = True):
     if print_: print(string)
 
 
-def parse_log_file(log_file: typing.IO) -> dict[str, np.ndarray]:
-    """
-    Parse a LAMMPS log file.
-
-    Parameters
-    ----------
-    log_file : file object
-
-    Returns
-    -------
-    dict
-        Dictionary containing thermodynamic output from the log file. Each
-        key-value pair corresponds to a column of the thermodynamic output.
-    """
-    thermo_info = None
-
-    log_file.seek(0)
-    prev_data = []
-    for line in filter(lambda x: x != "\n", log_file):
-        data = line.split()
-        if data[0] == "ec":
-            if thermo_info is None:
-                thermo_info = {column: [] for column in prev_data}
-            for i, key in enumerate(thermo_info):
-                type_ = int if key == "Step" else float
-                thermo_info[key].append(type_(data[i + 1]))
-        prev_data = data
-
-    if thermo_info is not None:
-        return {k: np.array(v) for k, v in thermo_info.items()}
-    else:
-        logging.error(
-                f"No thermodynamic information found in file {log_file.name}")
-        raise RuntimeError(
-                f"No thermodynamic information found in file {log_file.name}")
-
-
-def parse_log(log: str) -> dict[str, np.ndarray]:
-    """
-    Parse a LAMMPS log from a string.
-
-    Parameters
-    ----------
-    log : str
-
-    Returns
-    -------
-    dict
-        Dictionary containing thermodynamic output from the log file. Each
-        key-value pair corresponds to a column of the thermodynamic output.
-    """
-    thermo_info = None
-
-    prev_data = []
-    for line in filter(lambda x: x != "\n", log.splitlines()):
-        data = line.split()
-        if data[0] == "ec":
-            if thermo_info is None:
-                thermo_info = {column: [] for column in prev_data}
-            for i, key in enumerate(thermo_info):
-                type_ = int if key == "Step" else float
-                thermo_info[key].append(type_(data[i + 1]))
-        prev_data = data
-
-    if thermo_info is not None:
-        return {k: np.array(v) for k, v in thermo_info.items()}
-    else:
-        logging.error("No thermodynamic information found in log")
-        raise RuntimeError("No thermodynamic information found in log")
-
-
-def read_first_error_from_log_file(
-        log_file: typing.IO
-) -> tuple[str | None, str | None]:
-    """
-    Read first error message from a LAMMPS log file.
-
-    Parameters
-    ----------
-    log_file : file object
-
-    Returns
-    -------
-    str | NoneType
-        First error message from the log file.
-    str | NoneType
-        Last command executed before the error.
-    """
-    log_file.seek(0)
-    error = None
-    for line in log_file:
-        if line[:5] == "ERROR":
-            error = line
-            break
-    last_command = None if error is None else log_file.readline()
-    return error, last_command
-
-
-def read_first_error_from_log(
-        log_file: typing.IO
-) -> tuple[str | None, str | None]:
-    """
-    Read first error message from a LAMMPS log stored in a string.
-
-    Parameters
-    ----------
-    log : str
-
-    Returns
-    -------
-    str | NoneType
-        First error message from the log file.
-    str | NoneType
-        Last command executed before the error.
-    """
-    error = None
-    for line in log.splitlines():
-        if line[:5] == "ERROR":
-            error = line
-            break
-    last_command = None if error is None else log_file.readline()
-    return error, last_command
-
-
 def read_lammps_data(filename: str, verbosity: int = 0) -> ase.Atoms:
     """
     Read a simulation state from a LAMMPS data file.
@@ -200,30 +76,6 @@ def read_lammps_data(filename: str, verbosity: int = 0) -> ase.Atoms:
                 f, atom_style="atomic", sort_by_id=True)
         if verbosity > 1: logging.debug(f"Read data from {filename}.")
     return atoms
-
-
-def read_thermo_info(filename: str, verbosity: int = 1) -> dict[str, np.ndarray]:
-    """
-    Read thermo data from a LAMMPS output file.
-
-    Parameters
-    ----------
-    tf_name : str
-    verbosity : int
-
-    Returns
-    -------
-    dict
-        Dictionary containing thermodynamic output from the log file. Each
-        key-value pair corresponds to a column of the thermodynamic output.
-    """
-    with open(filename, "r") as thermo_file:
-        if verbosity > 1:
-            logging.debug(f"Opened file {tf_name} in append mode.")
-        thermo_info = parse_log_file(thermo_file)
-    if verbosity > 2:
-        logging.debug(f"Read thermo info from file {tf_name}.")
-    return thermo_info
 
 
 def is_defect_frenkel(lattice: np.ndarray, pos: np.ndarray) -> bool:
@@ -247,75 +99,6 @@ def is_defect_frenkel(lattice: np.ndarray, pos: np.ndarray) -> bool:
     Both lattice and pos must have the same shape.
     """
     return np.any(voronoi_occupation(lattice, pos) != 1)
-
-
-def run_lammps(
-    in_file: str, largs: dict, lvars: dict, threads: int = 1,
-    binary: typing.Optional[str] = None, debug: bool = False,
-    timer: bool = False, verbosity: int = 1
-) -> str:
-    """
-    Execute a LAMMPS script.
-    
-    Parameters
-    ----------
-    in_file : str
-        Name of the input file.
-    largs : dict
-        Dictionary of LAMMPS command line argument values with argument names
-        as keys. E.g. {"a" : 3} produces "-a 3" on the command line.
-    lvars : dict
-        Dictionary of LAMMPS variables with variable names as keys. E.g.
-        {"VAR" : "3"} produces "-v VAR 3" on the command line.
-    threads : int, optional
-        Number of threads to use in the simulation.
-    binary : str, optional
-        Name of the LAMMPS binary to use.
-    debug : bool, optional
-        If true, prints the command used to run LAMMPS.
-    timer : bool, optional
-        If true, logs the wall time it took to run LAMMPS.
-    verbosity : bool, optional
-
-    Returns
-    -------
-    str
-        Standard output from the LAMMPS simulation.
-
-    Notes
-    -----
-    To use more than one thread, the LAMMPS binary must be compiled to run
-    multithreaded.
-    """
-    args = []
-
-    if threads > 1: args += ["mpirun", "-np", str(threads)]
-
-    args += [binary, "-in", str(in_file)]
-    args += sum([[f"-{k}", str(v)] for k, v in largs.items()], start=[])
-    args += sum([["-v", str(k), str(v)] for k, v in lvars.items()], start=[])
-
-    if verbosity > 1:
-        log_print(" ".join(str(arg) for arg in args))
-    if timer:
-        start_time = time.time()
-    process = subprocess.run(args, capture_output=True, text=True)
-    if timer:
-        wall_elapsed = time.time() - start_time
-        log_print(f"LAMMPS run took {wall_elapsed:.0f} seconds wall time")
-    if process.returncode:
-        with open(largs["log"]) as f:
-            error, last_command = read_first_error_from_log_file(f)
-        if error is not None:
-            lammps_error = " ".join((error, last_command))
-            error_message = (f"LAMMPS exited with exit code {process.returncode:d}. "
-                    f"The following message was logged: {lammps_error}.")
-        else:
-            error_message = f"LAMMPS exited with exit code {process.returncode:d}."
-        logging.error(error_message)
-        raise RuntimeError(error_message)
-
-    return process.stdout
 
 
 def velocity_from(
@@ -977,8 +760,6 @@ class RelaxSimulation:
         If true, the run time of the simulation is recorded.
     lammps_threads : int
         Number of threads allowed fro use by LAMMPS.
-    binary : str
-        Name of the LAMMPS binary.
     screen : str
     timestep : float
         Timestep used in the simulation.
@@ -988,8 +769,7 @@ class RelaxSimulation:
         Number of steps the simulation should run for.
     """
     def __init__(
-        self, binary: str, lattice: Lattice,
-        lammps_io: LAMMPSIO, lammps_threads: int = 1,
+        self, lattice: Lattice, lammps_io: LAMMPSIO, lammps_threads: int = 1,
         screen: typing.Optional[str] = None, verbosity: int = 1,
         time_lammps: bool = False, timestep: float = 0.0002,
         duration: float = 1, temperature: float = 0.04
@@ -997,8 +777,6 @@ class RelaxSimulation:
         """
         Parameters
         ----------
-        binary : str, optional
-            Name of the LAMMPS binary.
         lattice : Lattice
             Simulation lattice.
         lammps_io : LAMMPSIO
@@ -1031,10 +809,7 @@ class RelaxSimulation:
 
         # LAMMPS
         self.lammps_threads = lammps_threads
-        self.binary = binary
-
-        # LAMMPS
-        self.screen = "none" if screen is None else screen
+        self.screen = screen
 
         # LAMMPS
         self.timestep = timestep
@@ -1052,7 +827,10 @@ class RelaxSimulation:
             Identifier for the simulation.
         verbosity : int, optional
         """
-        lmp = lammps.lammps(cmdargs=["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"])
+        cmdargs = ["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"]
+        if self.screen is not None:
+            cmdargs += ["-screen", self.screen]
+        lmp = lammps.lammps(cmdargs=cmdargs)
 
         lmp.cmd.units("metal")
         lmp.cmd.atom_style("atomic")
@@ -1086,7 +864,7 @@ class RelaxSimulation:
         lmp.cmd.fix("MYNPT", "all", "npt",
                 "temp", self.temperature, self.temperature, 100.0*self.timestep,
                 "aniso", 0.0, 0.0, 1.0)
-        lmp.cmd.run(20, post=False)
+        lmp.cmd.run(self.num_step, post=False)
         lmp.cmd.unfix("MYNPT")
 
         lmp.cmd.write_data(self.lammps_io.data_file_name(self.lattice, "relaxed"))
@@ -1115,8 +893,6 @@ class RecoilSimulation:
         If true, LAMMPS dump files are outputted periodically.
     lammps_threads : int
         Number of threads allowed fro use by LAMMPS.
-    binary : str
-        Name of the LAMMPS binary.
     timestep : float
         Timestep used in the simulation.
     temperature : float
@@ -1131,18 +907,15 @@ class RecoilSimulation:
         Bounding box of the interior region within the simulation region.
     """
     def __init__(
-        self, binary: str, lattice: Lattice,
-        io: ExperimentIO, lammps_io: LAMMPSIO, lammps_threads: int = 1,
-        save_thermo: typing.Optional[list] = None, dump: bool = False,
-        verbosity: int = 1, time_lammps: bool = False, timestep: float = 0.0002,
-        duration: float = 1, temperature: float = 0.04,
+        self, lattice: Lattice, io: ExperimentIO, lammps_io: LAMMPSIO,
+        lammps_threads: int = 1, save_thermo: typing.Optional[list] = None,
+        dump: bool = False, verbosity: int = 1, time_lammps: bool = False,
+        timestep: float = 0.0002, duration: float = 1, temperature: float = 0.04,
         border_thickness: float = 6.0, defect_threshold: float = 5
     ):
         """
         Parameters
         ----------
-        binary : str
-            Name of the LAMMPS binary.
         lattice : Lattice
             Simulation lattice.
         io : ExperimentIO
@@ -1187,7 +960,7 @@ class RecoilSimulation:
 
         # LAMMPS
         self.lammps_threads = lammps_threads
-        self.binary = binary
+        self.screen = None
 
         # LAMMPS
         self.timestep = timestep
@@ -1200,55 +973,6 @@ class RecoilSimulation:
             padding=0.5, lammps=False)
 
         self.bbox = self.lattice.interior_bbox(padding=border_thickness)
-
-
-    def impact_vars(
-        self, aind: int, atom_type: int, energy: float, unitv: np.ndarray,
-        df_name: str, istep: int = 20, seed: int = 1254623
-    ) -> dict:
-        """
-        Attach simulation arguments to LAMMPS input script variable names.
-
-        Parameters
-        ----------
-        aind : int
-            Index of the recoiling atom.
-        atom_type : int
-            Type ID of recoiling atom.
-        energy : float
-            Energy of the recoiling atom.
-        unitv : np.ndarray
-            Recoil direction.
-        df_name : str
-            Name of output data file.
-        istep : int, optional
-            Number of initial steps to run before generating the recoil.
-        """
-        vel = velocity_from(
-            energy*1.0e-9,
-            self.lattice.material.atom_props[atom_type]["mass"]*0.93149410242,
-            unitv)
-        dumpint = max(self.num_step//1000, 1)
-        return {
-            "ASTYLE": "atomic",
-            "DT": self.timestep,
-            "INDNAME": f"{self.lammps_io.data_file_name(self.lattice, "relaxed")}",
-            "OUTDNAME": f"{df_name}",
-            "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
-            "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}",
-            "DUMP": int(self.dump),
-            "DUMPINT": dumpint,
-            "DUMPDIR": f"{self.lammps_io.dump_dir}",
-            "T": self.temperature,
-            "ISTEP": istep,
-            "STEP": self.num_step,
-            "CAI": aind + 1,
-            "BXMIN": self.bbox[0,0], "BXMAX": self.bbox[0,1],
-            "BYMIN": self.bbox[1,0], "BYMAX": self.bbox[1,1],
-            "BZMIN": self.bbox[2,0], "BZMAX": self.bbox[2,1],
-            "VELX": vel[0], "VELY": vel[1], "VELZ": vel[2],
-            "SEED": seed
-        }
 
 
     def check_for_anomalous_defect(
@@ -1326,6 +1050,10 @@ class RecoilSimulation:
 
         shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
 
+        cmdargs = ["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"]
+        if self.screen is not None:
+            cmdargs += ["-screen", self.screen]
+        lmp = lammps.lammps(cmdargs=cmdargs)
         lmp = lammps.lammps()
 
         lmp.cmd.units("metal")
