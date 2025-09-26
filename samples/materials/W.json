@@ -11,7 +11,7 @@
         [0.0,    0.0,    3.1652]
     ],
     "atom_props": {
-        1: {
+        "1": {
             "mass": 183.84,
             "symbol": "W"
         }
@@ -19,6 +19,6 @@
     "pair_potential": {
         "style_name": "eam/fs",
         "pot_file": "W.Nordlund.eam.fs",
-        "style_args": []
+        "style_args": {}
     }
 }

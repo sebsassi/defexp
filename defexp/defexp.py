@@ -13,6 +13,8 @@ import typing
 import types
 import subprocess
 import json
+import glob
+import shutil
 
 import numpy as np
 import numpy.ma as ma
@@ -317,7 +319,7 @@ def run_lammps(
 
 
 def velocity_from(
-    kinetic_energy: float, mass: float, unitv: np.ndarray
+    kinetic_energy: float, mass: float, direction: np.ndarray
 ) -> np.ndarray:
     """
     Produce a velocity given particle energy, mass, and a unit vector.
@@ -326,7 +328,7 @@ def velocity_from(
     ----------
     kinetic_energy : float
     mass : float
-    unitv : numpy.ndarray
+    direction  numpy.ndarray
         Unit vector defining the direction of velocity.
 
     Returns
@@ -338,7 +340,7 @@ def velocity_from(
     Energy and mass must have the same units.
     """
     # Speed of light: 2997924.58 Å/ps
-    return (np.sqrt(2*kinetic_energy/mass)*2997924.58)*unitv
+    return (np.sqrt(2*kinetic_energy/mass)*2997924.58)*direction
 
 
 def make_atoms(
@@ -484,6 +486,14 @@ class Pair:
         self.coeff_args = coeff_args
 
 
+    def set(self, lmp: lammps.lammps):
+        """
+        Set pair data for a LAMMPS instance.
+        """
+        lmp.cmd.pair_style(self.style_name, *self.style_args)
+        lmp.cmd.pair_coeff("*", "*", self.pot_file, *self.coeff_args)
+
+
 class Material:
     """
     Class describing a crystalline material for LAMMPS defect simulations.
@@ -537,6 +547,14 @@ class Material:
         self.pair_potential = pair_potential
 
 
+    def set_masses(self, lmp: lammps.lammps):
+        """
+        Set atom masses for a LAMMPS instance.
+        """
+        for atom_type, props in self.atom_props.items():
+            lmp.cmd.mass(atom_type, props["mass"])
+
+
 class Lattice:
     """
     Class describing a lattice of atoms for LAMMPS simulations.
@@ -564,7 +582,6 @@ class Lattice:
         self.material = material
         self.repeat = repeat
         self.atoms = make_atoms(self.material.unit_cell, self.material.unit_cell_atoms, self.repeat)
-        self.repeat = repeat
         self.block = np.stack((
                 repeat[0]*self.material.unit_cell[0],
                 repeat[1]*self.material.unit_cell[1],
@@ -575,6 +592,10 @@ class Lattice:
     def central_cell(self) -> tuple[int]:
         """
         Integer coordinates of the innermost lattice cell.
+        
+        Returns
+        -------
+        tuple[int]
         """
         return tuple(n//2 for n in self.repeat)
 
@@ -643,7 +664,7 @@ class Lattice:
 
 
     def indices_in_bbox(
-        self, padding: float = 0, lammps: bool = False
+        self, padding: float = 0, lammps_format: bool = False
     ) -> np.ndarray:
         """
         Gives indices of atoms contained inside the lattice bounding box
@@ -652,7 +673,7 @@ class Lattice:
         Parameters
         ----------
         padding : float, optional
-        lammps : bool, optional
+        lammps_format : bool, optional
             If true, gives the indices in LAMMPS format (indexing starts from
             one). Otherwise indexing is assumed to start from 0.
 
@@ -666,7 +687,7 @@ class Lattice:
         max_mask = np.all(self.atoms.positions < max_bounds, axis=1)
         min_mask = np.all(self.atoms.positions > min_bounds, axis=1)
         indices = np.logical_and(max_mask, min_mask).nonzero()
-        return indices + 1 if lammps else indices
+        return indices + 1 if lammps_format else indices
 
 
     def interior_bbox(self, padding: float = 0) -> np.ndarray:
@@ -688,10 +709,40 @@ class Lattice:
 
 
 class ExperimentIO:
+    """
+    Class implementing non-LAMMPS IO operations.
+
+    Attributes
+    ----------
+    label : str
+        Label for the simulation.
+    res_dir : str
+        Directory for storing main simulation results.
+    thermo_dir : str
+        Directory for storing thermo output from simulation.
+    log_dir : str
+        Directory for storing log files.
+    save_thermo : list[str], optional
+        List of thermo variables to save.
+    """
     def __init__(
         self, label: str, res_dir: str, thermo_dir: str, log_dir: str,
-        save_thermo: typing.Optional[list] = None,
+        save_thermo: typing.Optional[list[str]] = None,
     ):
+        """
+        Parameters
+        ----------
+        label : str
+            Label for the simulation.
+        res_dir : str
+            Directory for storing main simulation results.
+        thermo_dir : str
+            Directory for storing thermo output from simulation.
+        log_dir : str
+            Directory for storing log files.
+        save_thermo : list[str], optional
+            List of thermo variables to save.
+        """
         self.label = label
 
         if not os.path.isdir(res_dir):
@@ -708,27 +759,27 @@ class ExperimentIO:
         self.save_thermo = save_thermo
 
 
-    def log_file_name(self, pid: int):
+    def log_file_name(self, pid: int) -> str:
         return f"{self.log_dir}/{self.label}_{pid}.log"
 
 
-    def _create_output_fname(self, style: str, label: str, *args):
+    def _create_output_file_name(self, style: str, label: str, *args) -> str:
         args_as_str = tuple(str(arg) for arg in args)
         fname = "_".join((self.label, style, label) + args_as_str) + ".dat"
         return f"{self.res_dir}/{fname}"
 
 
-    def eloss_fname(self, label: str, *args):
-        return self._create_output_fname("eloss", label, *args)
+    def eloss_file_name(self, label: str, *args) -> str:
+        return self._create_output_file_name("eloss", label, *args)
 
 
-    def frenkel_fname(self, label: str, *args):
-        return self._create_output_fname("frenkel", label, *args)
+    def frenkel_file_name(self, label: str, *args) -> str:
+        return self._create_output_file_name("frenkel", label, *args)
 
 
     def save_thermo_data(
         self, thermo_info: dict, energy: float, unitv: np.ndarray, aind: int,
-        pid : int, verbosity: int = 1
+        pid : int, verbosity: int = 1, binary: bool = True
     ):
         """
         Save thermodynamic data marked to be saved by the save_thermo member variable.
@@ -745,24 +796,57 @@ class ExperimentIO:
             Index of the recoiling atom.
         pid : int
             ID of the saving process.
+        verbosity : bool, optional
+        binary : bool, optional
+            If true, save data as a .npz binary file. If false, save as a text file.
         """
         if self.save_thermo is not None:
             data = np.column_stack([thermo_info[key] for key in self.save_thermo])
-            header = (
-                    f"Ekin {1.0e-9*energy:.16e} eV\n"
-                    f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
-                    f"{unitv[2]:.16e}]\n"
-                    " ".join(self.save_thermo))
-
             fname = f"{self.thermo_dir}/{self.label}_thermo_{aind}_{pid}_{hash(energy)}.dat"
-            np.savetxt(fname, data, header=header)
+            if binary:
+                np.savez(fname,
+                         energy=np.array(energy), direction=unitv,
+                         columns=np.array(self.save_thermo), thermo=data)
+            else:
+                header = (
+                        f"energy = {energy:.16e} eV\n"
+                        f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
+                        f"{unitv[2]:.16e}]\n"
+                        " ".join(self.save_thermo))
+                np.savetxt(fname, data, header=header)
             if verbosity > 1:
                 logging.debug(f"Saved thermodynamic data in {fname}.")
 
 
 class LAMMPSIO:
-    def __init__(self, experiment_label: str, work_dir: str, dump_dir: str):
-        self.label = experiment_label
+    """
+    Class implementing LAMMPS IO operations.
+
+    Attributes
+    ----------
+    label : str
+        Label for the simulation.
+    script_dir : str
+        Directory containing LAMMPS input scripts.
+    work_dir : str
+        Directory for files used by LAMMPS during the simulation.
+    dump_dir : str
+        Directory for LAMMPS dump output.
+    """
+    def __init__(self, label: str, work_dir: str, dump_dir: str):
+        """
+        Class implementing LAMMPS IO operations.
+
+        Parameters
+        ----------
+        label : str
+            Label for the simulation.
+        work_dir : str
+            Directory for files used by LAMMPS during the simulation.
+        dump_dir : str
+            Directory for LAMMPS dump output.
+        """
+        self.label = label
 
         if not os.path.isdir(work_dir):
             raise FileNotFoundError(f"{work_dir} is not a directory")
@@ -775,18 +859,19 @@ class LAMMPSIO:
 
 
     def empty_dump_dir(self):
-        os.system(f"rm {self.dump_dir}/*.dump {self.dump_dir}/*.dump.gz")
+        os.remove(glob.glob(f"{self.dump_dir}/*.dump"))
+        os.remove(glob.glob(f"{self.dump_dir}/*.dump.gz"))
 
 
-    def relax_script_path(self):
+    def relax_script_path(self) -> str:
         return f"{self.script_dir}/relaxation.lammpsin"
 
 
-    def impact_script_path(self):
+    def impact_script_path(self) -> str:
         return f"{self.script_dir}/impact.lammpsin"
 
 
-    def relaxation_log_fname(self, uid=None) -> str:
+    def relaxation_log_file_name(self, uid=None) -> str:
         if uid is None:
             return f"{self.work_dir}/{self.label}_relaxation.log"
         else:
@@ -882,24 +967,18 @@ class RelaxSimulation:
 
     Attributes
     ----------
-    material : Material
-        Material used in the simulation.
+    lattice : Lattice
+        Simulation lattice.
+    lammps_io : LAMMPSIO
+        Object for managing LAMMPS IO.
     verbosity : int
         Verbosity used for output.
     time_lammps : bool
         If true, the run time of the simulation is recorded.
-    io : ExperimentIO
-        Object for managing simulation IO.
     lammps_threads : int
         Number of threads allowed fro use by LAMMPS.
     binary : str
         Name of the LAMMPS binary.
-    mfname : str
-        Name of the file containing LAMMPS readable masses of the atoms.
-    pfname : str
-        Name of the file describing the pair interactions for LAMMPS.
-    imfname : str
-        Name of the file containing the initial state of the lattice.
     screen : str
     timestep : float
         Timestep used in the simulation.
@@ -907,28 +986,26 @@ class RelaxSimulation:
         Temperature used in the simulation.
     num_step : int
         Number of steps the simulation should run for.
-    config_path : str, optional
-        Path to config file directory.
     """
     def __init__(
         self, binary: str, lattice: Lattice,
         lammps_io: LAMMPSIO, lammps_threads: int = 1,
         screen: typing.Optional[str] = None, verbosity: int = 1,
         time_lammps: bool = False, timestep: float = 0.0002,
-        duration: float = 1, temperature: float = 0.04,
-        config_path: typing.Optional[str] = None
+        duration: float = 1, temperature: float = 0.04
     ):
         """
         Parameters
         ----------
         binary : str, optional
             Name of the LAMMPS binary.
-        material : Material
-            Material used in the simulation.
-        io : ExperimentIO
-            Object for managing simulation IO.
+        lattice : Lattice
+            Simulation lattice.
+        lammps_io : LAMMPSIO
+            Object for managing LAMMPS IO.
         lammps_threads : int, optional
             Number of threads allowed fro use by LAMMPS.
+        screen : str, optional
         verbosity : int, optional
             Verbosity used for output.
         time_lammps : bool, optional
@@ -940,8 +1017,6 @@ class RelaxSimulation:
             by `int(duration/timestep)`.
         temperature : float, optional
             Temperature used in the simulation.
-        config_path : str, optional
-            Path to config file directory.
         """
         self.lattice = lattice
 
@@ -975,24 +1050,9 @@ class RelaxSimulation:
         ----------
         uid : Any
             Identifier for the simulation.
+        verbosity : int, optional
         """
-        lammps_args = {
-            "screen": self.screen, 
-            "log": self.lammps_io.relaxation_log_fname(uid=uid)
-        }
-
-        relaxation_vars = {
-            "ASTYLE": "atomic",
-            "DT": self.timestep,
-            "T": self.temperature,
-            "STEP": self.num_step,
-            "INDNAME": f"{self.lammps_io.data_file_name(self.lattice, "default")}",
-            "OUTDNAME": f"{self.lammps_io.data_file_name(self.lattice, "relaxed")}",
-            "MFNAME": f"{self.lammps_io.mass_file_name(self.lattice.material)}",
-            "PFNAME": f"{self.lammps_io.pair_file_name(self.lattice.material)}"
-        }
-
-        lmp = lammps.lammps()
+        lmp = lammps.lammps(cmdargs=["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"])
 
         lmp.cmd.units("metal")
         lmp.cmd.atom_style("atomic")
@@ -1001,7 +1061,7 @@ class RelaxSimulation:
         lmp.cmd.read_data(self.lammps_io.data_file_name(self.lattice, "default"))
 
         self.lattice.material.set_masses(lmp)
-        self.lattice.material.set_pair(lmp)
+        self.lattice.material.pair_potential.set(lmp)
 
         lmp.cmd.timestep(self.timestep)
 
@@ -1017,8 +1077,9 @@ class RelaxSimulation:
         lmp.cmd.thermo_style("custom",
                 "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
                 "pxx", "pyy", "lx", "ly", "lz")
-        lmp.cmd.thermo_modify(line="one", flush=True,
-                "format", 1, "ec %8lu", "format", "float", "%15.10g")
+        lmp.cmd.thermo_modify(line="one", flush=True)
+        lmp.cmd.thermo_modify("format", 1, "\"ec %8lu\"")
+        lmp.cmd.thermo_modify("format", "float", "%15.10g")
 
         lmp.cmd.velocity("all", "create", self.temperature, 1254623,
                 rot=True, mom=True, dist="gaussian")
@@ -1037,27 +1098,25 @@ class RecoilSimulation:
 
     Attributes
     ----------
-    material : Material
-        Material used in the simulation.
+    lattice : Lattice
+        Simulation lattice.
     defect_threshold : float
         Change in potential energy in eV of the system needed to flag a
         simulation as having produced defects.
-    energies : numpy.ndarray
-        Simulated recoil energies in GeV.
     verbosity : int
         Verbosity used for output.
     time_lammps : bool
         If true, the run time of the simulation is logged.
+    lammps_io : LAMMPSIO
+        Object for managing LAMMPS IO.
+    io : EperimentIO
+        Object for managing non-LAMMPS IO.
+    dump : bool
+        If true, LAMMPS dump files are outputted periodically.
     lammps_threads : int
         Number of threads allowed fro use by LAMMPS.
     binary : str
         Name of the LAMMPS binary.
-    mfname : str
-        Name of the file containing LAMMPS readable masses of the atoms.
-    pfname : str
-        Name of the file describing the pair interactions for LAMMPS.
-    screen : str
-        While where LAMMPS writes its screen output.
     timestep : float
         Timestep used in the simulation.
     temperature : float
@@ -1070,34 +1129,30 @@ class RecoilSimulation:
         Indices of atoms to be used in the Frenkel defect analysis.
     bbox : np.ndarray
         Bounding box of the interior region within the simulation region.
-    config_path : str, optional
-        Path to config file directory.
     """
     def __init__(
         self, binary: str, lattice: Lattice,
         io: ExperimentIO, lammps_io: LAMMPSIO, lammps_threads: int = 1,
         save_thermo: typing.Optional[list] = None, dump: bool = False,
-        screen: typing.Optional[str] = None, verbosity: int = 1,
-        time_lammps: bool = False, timestep: float = 0.0002,
+        verbosity: int = 1, time_lammps: bool = False, timestep: float = 0.0002,
         duration: float = 1, temperature: float = 0.04,
-        border_thickness: float = 6.0, defect_threshold: float = 5,
-        config_path: typing.Optional[str] = None
+        border_thickness: float = 6.0, defect_threshold: float = 5
     ):
         """
         Parameters
         ----------
         binary : str
             Name of the LAMMPS binary.
-        material : Material
-            Material used in the simulation.
+        lattice : Lattice
+            Simulation lattice.
+        io : ExperimentIO
+            Object for managing non-LAMMPS IO.
+        lammps_io : LAMMPSIO
+            Object for managing LAMMPS IO.
         lammps_threads : int, optional
             Number of threads allowed fro use by LAMMPS.
-        io : ExperimentIO
-            Object for managing simulation IO.
         dump : bool, optional
             If true, dumps intermediate simulation states.
-        screen : str, optional
-            While where LAMMPS writes its screen output.
         verbosity : int, optional
             Verbosity of logging output.
         time_lammps : bool, optional
@@ -1116,8 +1171,6 @@ class RecoilSimulation:
         defect_threshold : float, optional
             Change in potential energy in eV of the system needed to flag a 
             simulation as having produced defects.
-        config_path : str, optional
-            Path to config file directory.
         """
         self.lattice = lattice
         self.defect_threshold = defect_threshold
@@ -1251,7 +1304,7 @@ class RecoilSimulation:
             simulation.
         test_frenkel : bool, optional
             If true, test for frenkel defects.
-        zero_nonfrenkel : bool, Deprecated since version 23Jun2022.optional
+        zero_nonfrenkel : bool, optional
             If true, change in potential energy is zeroed if no Frenkel defects
             are detected.
         smooth_count : int, optional
@@ -1271,7 +1324,7 @@ class RecoilSimulation:
             Boolean of whether a Frenkel defect was detected in the simulation.
         """
 
-        os.system(f"cp {self.lammps_io.data_file_name(self.lattice, "relaxed")} {df_name}")
+        shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
 
         lmp = lammps.lammps()
 
@@ -1282,7 +1335,7 @@ class RecoilSimulation:
         lmp.cmd.read_data(df_name)
 
         self.lattice.material.set_masses(lmp)
-        self.lattice.material.set_pair(lmp)
+        self.lattice.material.pair_potential.set(lmp)
 
         lmp.cmd.timestep(self.timestep)
 
@@ -1323,8 +1376,9 @@ class RecoilSimulation:
         lmp.cmd.thermo_style("custom",
                 "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
                 "pxx", "pyy", "lx", "ly", "lz")
-        lmp.cmd.thermo_modify(line="one", flush=True,
-                "format", 1, "ec %8lu", "format", "float", "%15.10g")
+        lmp.cmd.thermo_modify(line="one", flush=True)
+        lmp.cmd.thermo_modify("format", 1, "\"ec %8lu\"")
+        lmp.cmd.thermo_modify("format", "float", "%15.10g")
 
         lmp.cmd.velocity("all", "create", self.temperature, self.seed,
                 rot=True, mom=True, dist="gaussian")

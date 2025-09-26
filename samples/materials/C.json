@@ -24,6 +24,6 @@
     "pair_potential": {
         "style_name": "tersoff/table",
         "pot_file": "C_nordlund.tersoff",
-        "style_args": []
+        "style_args": {}
     }
 

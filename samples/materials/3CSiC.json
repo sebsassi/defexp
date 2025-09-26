@@ -28,6 +28,6 @@
     "pai_potential": {
         "style_name": "gw",
         "pot_file": "SiC.gw",
-        "style_args": []
+        "style_args": {}
     }
 }

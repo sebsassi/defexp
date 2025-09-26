@@ -3,7 +3,7 @@
     "temperature": 0.04,
     "timestep": 0.0005,
     "relax_duration": 1.0,
-    "impact_duration": 4.0,
+    "impact_duration": 8.0,
     "emin": 0.0,
     "emax": 200.0
 }
