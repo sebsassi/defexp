@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("--duration", type=float, default=None, help="simulation duration in picoseconds")
+    parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
     args = parser.parse_args()
 
     if args.lmp_binary is not None:
@@ -47,6 +48,7 @@ if __name__ == "__main__":
 
     lattice = defexp.Lattice(material, sim_info["repeat"])
 
+    timestep = args.timestep if args.timestep is not None else sim_info["timestep"]
     duration = args.duration if args.duration is not None else sim_info["relax_duration"]
 
     label = f"relax_{material.label}"
@@ -54,8 +56,7 @@ if __name__ == "__main__":
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RelaxSimulation(
-            lmp_binary, lattice, lammps_io, time_lammps=True,
-            timestep=sim_info["timestep"], duration=sim_info["impact_duration"],
-            temperature=sim_info["temperature"])
+            lmp_binary, lattice, lammps_io, time_lammps=True, timestep=timestep,
+            duration=duration, temperature=sim_info["temperature"])
 
     simulation.run(verbosity=2)
