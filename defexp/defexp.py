@@ -20,6 +20,8 @@ import numpy as np
 import numpy.ma as ma
 import numpy.linalg as linalg
 
+import scipy.optimize as opt
+
 import lammps
 
 import ase
@@ -54,6 +56,32 @@ def ensure_file_ends_with_new_line(filename: str, verbosity: int):
 def log_print(string: str, print_: bool = True):
     logging.info(string)
     if print_: print(string)
+
+
+def read_first_error_from_log(
+        log_file: typing.IO
+) -> tuple[str | None, str | None]:
+    """
+    Read first error message from a LAMMPS log stored in a string.
+
+    Parameters
+    ----------
+    log : str
+
+    Returns
+    -------
+    str | NoneType
+        First error message from the log file.
+    str | NoneType
+        Last command executed before the error.
+    """
+    error = None
+    for line in log.splitlines():
+        if line[:5] == "ERROR":
+            error = line
+            break
+    last_command = None if error is None else log_file.readline()
+    return error, last_command
 
 
 def read_lammps_data(filename: str, verbosity: int = 0) -> ase.Atoms:
@@ -585,12 +613,13 @@ class ExperimentIO:
         """
         if self.save_thermo is not None:
             data = np.column_stack([thermo_info[key] for key in self.save_thermo])
-            fname = f"{self.thermo_dir}/{self.label}_thermo_{aind}_{pid}_{hash(energy)}.dat"
             if binary:
+                fname = f"{self.thermo_dir}/{self.label}_thermo_{aind}_{pid}_{hash(energy)}.dat"
                 np.savez(fname,
                          energy=np.array(energy), direction=unitv,
                          columns=np.array(self.save_thermo), thermo=data)
             else:
+                fname = f"{self.thermo_dir}/{self.label}_thermo_{aind}_{pid}_{hash(energy)}.npz"
                 header = (
                         f"energy = {energy:.16e} eV\n"
                         f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
@@ -654,11 +683,11 @@ class LAMMPSIO:
         return f"{self.script_dir}/impact.lammpsin"
 
 
-    def relaxation_log_file_name(self, uid=None) -> str:
+    def log_file_name(self, uid=None) -> str:
         if uid is None:
-            return f"{self.work_dir}/{self.label}_relaxation.log"
+            return f"{self.work_dir}/{self.label}.log"
         else:
-            return f"{self.work_dir}/{self.label}_relaxation_{uid:d}.log"
+            return f"{self.work_dir}/{self.label}_{uid:d}.log"
 
 
     def pair_file_name(self, material: Material) -> str:
@@ -772,7 +801,7 @@ class RelaxSimulation:
         self, lattice: Lattice, lammps_io: LAMMPSIO, lammps_threads: int = 1,
         screen: typing.Optional[str] = None, verbosity: int = 1,
         time_lammps: bool = False, timestep: float = 0.0002,
-        duration: float = 1, temperature: float = 0.04
+        duration: float = 1, temperature: float = 0.04, thermo_interval: int = 10
     ):
         """
         Parameters
@@ -797,6 +826,7 @@ class RelaxSimulation:
             Temperature used in the simulation.
         """
         self.lattice = lattice
+        self.thermo_interval = thermo_interval
 
         self.lammps_io = lammps_io
         self.lammps_io.write_lammps_data(self.lattice, "default", verbosity)
@@ -827,7 +857,7 @@ class RelaxSimulation:
             Identifier for the simulation.
         verbosity : int, optional
         """
-        cmdargs = ["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"]
+        cmdargs = ["-log", self.lammps_io.log_file_name(uid=uid), "-echo", "both"]
         if self.screen is not None:
             cmdargs += ["-screen", self.screen]
         lmp = lammps.lammps(cmdargs=cmdargs)
@@ -851,7 +881,7 @@ class RelaxSimulation:
 
         lmp.cmd.compute("EP", "all", "pe")
 
-        lmp.cmd.thermo(10)
+        lmp.cmd.thermo(self.thermo_interval)
         lmp.cmd.thermo_style("custom",
                 "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
                 "pxx", "pyy", "lx", "ly", "lz")
@@ -897,8 +927,8 @@ class RecoilSimulation:
         Timestep used in the simulation.
     temperature : float
         Temperature used in the simulation.
-    num_step : int
-        Number of steps the simulation should run for.
+    max_step : int
+        Maximum number of steps the simulation should run for.
     relaxed_atoms : ase.Atoms
         Object containing the initial state of the lattice.
     frenkel_indices : np.ndarray
@@ -910,8 +940,9 @@ class RecoilSimulation:
         self, lattice: Lattice, io: ExperimentIO, lammps_io: LAMMPSIO,
         lammps_threads: int = 1, save_thermo: typing.Optional[list] = None,
         dump: bool = False, verbosity: int = 1, time_lammps: bool = False,
-        timestep: float = 0.0002, duration: float = 1, temperature: float = 0.04,
-        border_thickness: float = 6.0, defect_threshold: float = 5
+        timestep: float = 0.0002, max_duration: float = 1, temperature: float = 0.04,
+        border_thickness: float = 6.0, defect_threshold: float = 5,
+        fit_window: float = 1.0, thermo_interval: int = 10, poterr: float = 0.5
     ):
         """
         Parameters
@@ -933,9 +964,10 @@ class RecoilSimulation:
         timestep : float, optional
             Simulation time step. Units are determined by the units defined in
             the LAMMPS input file.
-        duration : float, optional
-            Duration of the simulation. The number of time steps the simulation
-            runs is given by `int(duration/timestep)`.
+        max_duration : float, optional
+            Maximum duration of the simulation. The maximum number of time
+            steps the simulation runs for is given by
+            `int(max_duration/timestep)`.
         temperature : float, optional
             Target temperature of the simulation.
         border_thickness : float, optional
@@ -944,9 +976,21 @@ class RecoilSimulation:
         defect_threshold : float, optional
             Change in potential energy in eV of the system needed to flag a 
             simulation as having produced defects.
+        fit_window : float, optional
+            Length of the window (in time units) used for fitting an exponential
+            to the potential energy for convergence testing.
+        thermo_interval : int, optional
+            Number of timesteps between thermo outputs.
+        poterr : float, optional
+            Convergence criterion: difference between the last computed
+            potential energy and the asymptotic potential energy of the fit.
         """
         self.lattice = lattice
         self.defect_threshold = defect_threshold
+        self.fit_len = int(fit_window/(timestep*thermo_interval))
+        self.max_batch = int(max_duration/(timestep*thermo_interval))
+        self.max_step = int(max_duration/timestep)
+        self.poterr = poterr
 
         # Logging
         self.time_lammps = time_lammps
@@ -965,12 +1009,12 @@ class RecoilSimulation:
         # LAMMPS
         self.timestep = timestep
         self.temperature = temperature
-        self.num_step = int(duration/timestep)
+        self.thermo_interval = thermo_interval
 
         self.relaxed_atoms = read_lammps_data(self.lammps_io.data_file_name(self.lattice, "relaxed"))
 
         self.frenkel_indices = self.lattice.indices_in_bbox(
-            padding=0.5, lammps=False)
+            padding=0.5, lammps_format=False)
 
         self.bbox = self.lattice.interior_bbox(padding=border_thickness)
 
@@ -982,7 +1026,7 @@ class RecoilSimulation:
         has_defect_anomaly = ((has_frenkel_defect and not has_epot_defect)
                               or (not has_frenkel_defect and has_epot_defect))
 
-        if has_defect_anomaly and test_frenkel:
+        if has_defect_anomaly:
             log_file_name = self.io.log_file_name(pid)
             if verbosity > 2:
                 logging.debug(f"Opened file {logfname} in append mode.")
@@ -1050,7 +1094,7 @@ class RecoilSimulation:
 
         shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
 
-        cmdargs = ["-log", self.lammps_io.relaxation_log_file_name(uid=uid), "-echo", "both"]
+        cmdargs = ["-log", self.lammps_io.log_file_name(uid=pid), "-echo", "both"]
         if self.screen is not None:
             cmdargs += ["-screen", self.screen]
         lmp = lammps.lammps(cmdargs=cmdargs)
@@ -1094,13 +1138,13 @@ class RecoilSimulation:
 
         if self.dump:
             lmp.cmd.dump("MYDUMP", "all", "custom/gz",
-                    max(self.num_step//1000, 1),
+                    max(self.max_step//1000, 1),
                     f"{self.lammps_io.dump_dir}/*.dump.gz",
                     "id", "type", "x", "y", "z", "c_EPA", "c_EKA",
                     "vx", "vy", "vz")
             lmp.cmd.dump_modify("MYDUMP", pad=8)
 
-        lmp.cmd.thermo(10)
+        lmp.cmd.thermo(self.thermo_interval)
         lmp.cmd.thermo_style("custom",
                 "step", "time", "dt", "temp", "pe", "etotal", "press", "vol",
                 "pxx", "pyy", "lx", "ly", "lz")
@@ -1108,7 +1152,7 @@ class RecoilSimulation:
         lmp.cmd.thermo_modify("format", 1, "\"ec %8lu\"")
         lmp.cmd.thermo_modify("format", "float", "%15.10g")
 
-        lmp.cmd.velocity("all", "create", self.temperature, self.seed,
+        lmp.cmd.velocity("all", "create", self.temperature, seed,
                 rot=True, mom=True, dist="gaussian")
         lmp.cmd.fix("MYNPT", "all", "npt",
                 "temp", self.temperature, self.temperature, 100.0*self.timestep,
@@ -1126,14 +1170,49 @@ class RecoilSimulation:
                 "temp", self.temperature, self.temperature, 100.0*self.timestep)
         lmp.cmd.fix("CONSERVE", "INTERIOR_ATOMS", "nve")
 
-        num_batch = self.num_step//10
+        max_batch = self.max_step//10
 
-        for i in range(num_batch):
-            lmp.cmd.run(10, pre=False, post=False)
-            for key, value in lmp.last_thermo():
+        def fit_func(x, a, b, c):
+            return a*np.exp(-b*x) + c
+
+        lmp.cmd.run(self.thermo_interval, post=False)
+        for i in range(self.fit_len):
+            lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+
+            for key, value in lmp.last_thermo().items():
                 thermo_info[key].append(value)
 
-        positons = lmp.numpy.extract_atom("x")
+        pinit = [
+            np.max(thermo_info["PotEng"]) - thermo_info["PotEng"][-1],
+            1.0,
+            thermo_info["PotEng"][-1]
+        ]
+
+        for i in range(max_batch):
+            lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+
+            for key, value in lmp.last_thermo().items():
+                thermo_info[key].append(value)
+
+            time_segment = np.array(thermo_info["Time"][-self.fit_len:])
+            pot_segment = np.array(thermo_info["PotEng"][-self.fit_len:])
+
+            try:
+                popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
+                pinit = popt
+            except RuntimeError:
+                pinit = [
+                    np.max(thermo_info["PotEng"]) - thermo_info["PotEng"][-1],
+                    1.0,
+                    thermo_info["PotEng"][-1]
+                ]
+                continue
+
+            if np.abs(pinit[2] - pot_segment[-1]) < self.poterr:
+                break
+
+
+        positions = lmp.numpy.extract_atom("x")
 
         self.io.save_thermo_data(thermo_info, energy, unitv, aind, pid)
 
@@ -1146,12 +1225,12 @@ class RecoilSimulation:
                 log_print(
                     "Tested Frenkel defect. Frenkel defects:", has_frenkel_defect)
 
-        epot = thermo_info["PotEng"]
+        start_epot = thermo_info["PotEng"][0]
+        end_epot = pinit[2]
 
-        end_epot = np.mean(epot[-smooth_count:])
         zero_condition = ((not has_frenkel_defect)
                           and test_frenkel and zero_nonfrenkel)
-        depot = 0 if zero_condition else (end_epot - epot[0])
+        depot = 0 if zero_condition else (end_epot - start_epot)
 
         if verbosity > 2:
             log_print(f"Checked potential energy. Difference: {depot}")

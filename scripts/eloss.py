@@ -143,6 +143,8 @@ if __name__ == "__main__":
     parser.add_argument("--energy", type=float, default=None, help="fixed recoil energy")
     parser.add_argument("--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument("--emax", type=float, default=None, help="maximum recoil energy")
+    parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
+    parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
     parser.add_argument("--dump", action="store_true", help="make periodic dumps of simulation state")
     args = parser.parse_args()
 
@@ -168,6 +170,8 @@ if __name__ == "__main__":
     logging.info(f"Energy: {args.energy}")
     logging.info(f"Minimum energy: {args.emin}")
     logging.info(f"Maximum energy: {args.emax}")
+    logging.info(f"Maximum duration: {args.max_duration}")
+    logging.info(f"Timestep: {args.timestep}")
     logging.info(f"Dump: {args.dump}")
 
     if args.lmp_binary is not None:
@@ -198,16 +202,17 @@ if __name__ == "__main__":
         emin = args.emin if args.emin is not None else sim_info["emin"]
         emax = args.emax if args.emax is not None else sim_info["emax"]
 
+    timestep = args.timestep if args.timestep is not None else sim_info["timestep"]
+    max_duration = args.max_duration if args.max_duration is not None else sim_info["impact_duration"]
+
     label = f"eloss_{material.label}"
     exp_io = defexp.ExperimentIO(
             label, res_dir, thermo_dir, log_dir, save_thermo=["Time", "PotEng"])
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RecoilSimulation(
-            lmp_binary, lattice, exp_io, lammps_io, dump=args.dump,
-            time_lammps=True, timestep=sim_info["timestep"], 
-            duration=sim_info["impact_duration"],
-            temperature=sim_info["temperature"])
+            lattice, exp_io, lammps_io, dump=args.dump, time_lammps=True,
+            timestep=timestep, max_duration=max_duration, temperature=sim_info["temperature"])
 
     ainds = lattice.indices_in_central_cell(lammps=False)
     atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]

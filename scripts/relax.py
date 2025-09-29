@@ -15,6 +15,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
+    parser.add_argument("--duration", type=float, default=None, help="simulation duration in picoseconds")
     args = parser.parse_args()
 
     if args.lmp_binary is not None:
@@ -45,6 +46,8 @@ if __name__ == "__main__":
     energies = np.loadtxt(f"{args.config_dir}/energies/{args.material}.dat")
 
     lattice = defexp.Lattice(material, sim_info["repeat"])
+
+    duration = args.duration if args.duration is not None else sim_info["relax_duration"]
 
     label = f"relax_{material.label}"
     exp_io = defexp.ExperimentIO(label, res_dir, thermo_dir, log_dir)
