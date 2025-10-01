@@ -18,6 +18,7 @@ shift 2
 srun lscpu
 
 MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
+MD_PROJ=$PROJ/mdsim
 
 if [ ! -d "$MD_WORKDIR/lammps_work" ]; then
     echo "Directory $MD_WORKDIR/lammps_work does not exist."
@@ -75,19 +76,19 @@ else
     exit 1
 fi
 
-if [ ! -d "$PROJ/mdsim/venv" ]; then
+if [ ! -d "$MD_PROJ/venv" ]; then
     echo "Virtual environment does not exist."
     exit 1
 fi
 
-source "$PROJ/mdsim/venv/bin/activate"
+source "$MD_PROJ/venv/bin/activate"
 if [ $? -ne 0 ]; then
     echo "Failed to source virtual environment."
     exit 1
 fi
 
-srun python "$PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$SEED" "$COUNT" \
-    --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR" --work-dir "$MD_WORKDIR" 
+srun python "$MD_PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$SEED" "$COUNT" \
+    --config-dir "$MD_PROJ/defexp/samples" --res-dir "$MD_WORKDIR" --work-dir "$MD_WORKDIR" 
 
 deactivate
 
