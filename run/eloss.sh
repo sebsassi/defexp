@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=eloss
 #SBATCH -M kale
+#SBATCH -p short
 #SBATCH -c 1
 #SBATCH -n 1
 #SBATCH -t 23:00:00
