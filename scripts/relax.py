@@ -11,23 +11,12 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material name")
-    parser.add_argument("-b", "--lmp-binary", type=str, default=None, help="name of the LAMMPS binary")
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("--duration", type=float, default=None, help="simulation duration in picoseconds")
     parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
     args = parser.parse_args()
-
-    if args.lmp_binary is not None:
-        lmp_binary = args.lmp_binary
-    else:
-        lmp_binary = os.getenv("LMP_BINARY", default=None)
-    if lmp_binary is None:
-        raise RuntimeError(
-                "Missing LAMMPS binary. Either provide name of the LAMMPS "
-                "binary in the relevant command line argument or set the "
-                "environment variable LMP_BINARY.")
 
     lmp_dir = f"{args.work_dir}/lammps_work"
     dump_dir = f"{args.work_dir}/dump"

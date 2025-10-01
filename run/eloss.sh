@@ -85,7 +85,7 @@ if [ $? -ne 0 ]; then
 fi
 
 srun python "$PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$COUNT" \
-    --lmp-binary "$LMP_BINARY" --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR"
+    --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR" --work-dir "$MD_WORKDIR" 
 
 deactivate
 

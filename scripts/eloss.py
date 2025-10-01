@@ -133,7 +133,6 @@ if __name__ == "__main__":
     parser.add_argument("i", type=int, help="index of recoil atom")
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
-    parser.add_argument("-b", "--lmp-binary", type=str, default=None, help="name of the LAMMPS binary")
     parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
@@ -173,16 +172,6 @@ if __name__ == "__main__":
     logging.info(f"Maximum duration: {args.max_duration}")
     logging.info(f"Timestep: {args.timestep}")
     logging.info(f"Dump: {args.dump}")
-
-    if args.lmp_binary is not None:
-        lmp_binary = args.lmp_binary
-    else:
-        lmp_binary = os.getenv("LMP_BINARY", default=None)
-    if lmp_binary is None:
-        raise RuntimeError(
-                "Missing LAMMPS binary. Either provide name of the LAMMPS "
-                "binary in the relevant command line argument or set the "
-                "environment variable LMP_BINARY.")
 
     res_dir = f"{args.res_dir}/eloss/{args.material}"
     lmp_dir = f"{args.work_dir}/lammps_work"
