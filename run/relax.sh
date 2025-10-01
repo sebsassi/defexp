@@ -32,6 +32,14 @@ else
     exit 1
 fi
 
+module load FFTW
+if [ $? -eq 0 ]; then
+    echo "Module FFTW loaded successfully."
+else
+    echo "Failed to load FFTW."
+    exit 1
+fi
+
 module load Python
 if [ $? -eq 0 ]; then
     echo "Module Python loaded successfully."
