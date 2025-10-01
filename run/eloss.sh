@@ -7,7 +7,7 @@
 #SBATCH -t 23:00:00
 #SBATCH --mem-per-cpu=600
 #SBATCH --error="/home/%u/err/eloss-%j.err"
-#SBATCH --output="/home/%uout/eloss-%j.out"
+#SBATCH --output="/home/%u/out/eloss-%j.out"
 #SBATCH --hint=nomultithread
 
 MATERIAL=$1
