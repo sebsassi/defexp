@@ -56,7 +56,7 @@ if __name__ == "__main__":
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RelaxSimulation(
-            lmp_binary, lattice, lammps_io, time_lammps=True, timestep=timestep,
+            lattice, lammps_io, time_lammps=True, timestep=timestep,
             duration=duration, temperature=sim_info["temperature"])
 
     simulation.run(verbosity=2)
