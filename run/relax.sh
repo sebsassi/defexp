@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -M kale
 #SBATCH -t 04:00
-#SBATCH --mem-per-cpu=60
+#SBATCH --mem-per-cpu=600
 #SBATCH --error="/home/%u/relax-%j.err"
 #SBATCH --output="/home/%u/relax-%j.out"
 
