@@ -19,7 +19,7 @@ srun lscpu
 
 MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
 
-if [ ! -d "$MD_WORKDIR/lampps_work" ]; then
+if [ ! -d "$MD_WORKDIR/lammps_work" ]; then
     echo "Directory $MD_WORKDIR/lammps_work does not exist."
     exit 1
 fi
