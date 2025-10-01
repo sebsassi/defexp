@@ -11,6 +11,7 @@
 
 MATERIAL=$1
 COUNT=$2
+SEED=1337
 shift 2
 
 srun lscpu
@@ -84,7 +85,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-srun python "$PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$COUNT" \
+srun python "$PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$SEED" "$COUNT" \
     --config-dir "$PROJ/mdsim/defexp/samples" --res-dir "$MD_WORKDIR" --work-dir "$MD_WORKDIR" 
 
 deactivate
