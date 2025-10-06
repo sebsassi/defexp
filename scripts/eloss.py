@@ -78,9 +78,9 @@ def random_energy_loss(
         lammps_args["screen"] = screen
 
     for i in range(count):
-        if verbosity in (1,2):
+        if verbosity > 0:
             defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
-        elif verbosity > 2:
+        elif verbosity > 1:
             defexp.log_print(
                     f"Working on sample {i + 1:d}/{count:d}: "
                     f"{pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
@@ -90,13 +90,13 @@ def random_energy_loss(
                 tf_name, pid, **kwargs)
 
         with open(result_fname, "a") as f:
-            if verbosity > 1:
+            if verbosity > 2:
                 logging.debug(f"Opened file {result_fname} in append mode.")
             f.write(
                     f"{pa[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
                     f"{depot:.16e} {int(frenkel_defect)}\n")
 
-        if verbosity > 1:
+        if verbosity > 2:
             logging.debug(f"Wrote to file {result_fname}.")
 
 
@@ -145,15 +145,19 @@ if __name__ == "__main__":
     parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
     parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
     parser.add_argument("--dump", action="store_true", help="make periodic dumps of simulation state")
+    parser.add_argument("--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     args = parser.parse_args()
 
     timestamp = int(time.time())
-    seed = abs(hash((args.seed, args.jid, args.i, timestamp)))
+    if (args.raw_seed)
+        seed = args.seed
+    else
+        seed = abs(hash((args.seed, args.jid, args.i, timestamp)))
 
     logging.basicConfig(
             filename=f"thresholds_{args.material}_{args.jid:d}_{args.i:d}_{args.seed:d}_{args.count:d}.log",
             level=logging.DEBUG)
-    logging.info(f"Date: {datetime.date.fromtimestamp(timestamp)}")
+    logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
     logging.info(f"Material: {args.material}")
     logging.info(f"Job ID: {args.jid}")
     logging.info(f"Index: {args.i}")
@@ -210,4 +214,5 @@ if __name__ == "__main__":
     execute(
             simulation, seed, args.count, emin, emax, atom_index, args.i,
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
-            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel)
+            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel
+            verbosity=2)

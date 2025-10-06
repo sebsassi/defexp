@@ -48,7 +48,7 @@ def ensure_file_ends_with_new_line(filename: str, verbosity: int):
             elif last_line[-1] != "\n": f.write("\n")
     else:
         with open(filename, "a") as f:
-            if verbosity > 1:
+            if verbosity > 2:
                 logging.debug(f"Opened file {filename} in append mode.")
             f.write("\n")
 
@@ -1034,7 +1034,7 @@ class RecoilSimulation:
                 log_file.write(
                     f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
                         f"{unitv[2]:.16e}], "
-                        f"Ekin = {energy:.16e} GeV\n"
+                        f"Ekin = {energy:.16e} eV\n"
                         f"Frenkel defect: {has_frenkel_defect}\n"
                         f"Epot defect: {has_epot_defect}\n\n")
             if verbosity > 2:
@@ -1232,7 +1232,7 @@ class RecoilSimulation:
                           and test_frenkel and zero_nonfrenkel)
         depot = 0 if zero_condition else (end_epot - start_epot)
 
-        if verbosity > 2:
+        if verbosity > 1:
             log_print(f"Checked potential energy. Difference: {depot}")
 
         has_epot_defect = depot > self.defect_threshold
