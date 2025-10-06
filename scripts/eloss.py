@@ -43,6 +43,7 @@ def random_energy_loss(
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     screen: typing.Optional[str] = None, verbosity: int = 1, **kwargs
 ):
+    print(verbosity, kwargs)
     rng = np.random.default_rng(seed)
 
     if direction == (0.0, 0.0) and max_angle == np.pi:
@@ -78,16 +79,16 @@ def random_energy_loss(
         lammps_args["screen"] = screen
 
     for i in range(count):
-        if verbosity > 0:
-            defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
-        elif verbosity > 1:
+        if verbosity > 1:
             defexp.log_print(
                     f"Working on sample {i + 1:d}/{count:d}: "
                     f"{pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
+        elif verbosity == 1:
+            defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
 
         depot, frenkel_defect = recoil_simulation.run(
                 atom_type, aind, unitv[i], energies[i], df_name, lammps_args,
-                tf_name, pid, **kwargs)
+                tf_name, pid, verbosity=verbosity, **kwargs)
 
         with open(result_fname, "a") as f:
             if verbosity > 2:
@@ -143,15 +144,17 @@ if __name__ == "__main__":
     parser.add_argument("--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument("--emax", type=float, default=None, help="maximum recoil energy")
     parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
-    parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
+    parser.add_argument("--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
     parser.add_argument("--dump", action="store_true", help="make periodic dumps of simulation state")
     parser.add_argument("--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
+    parser.add_argument("--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument("--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     args = parser.parse_args()
 
     timestamp = int(time.time())
-    if (args.raw_seed)
+    if (args.raw_seed):
         seed = args.seed
-    else
+    else:
         seed = abs(hash((args.seed, args.jid, args.i, timestamp)))
 
     logging.basicConfig(
@@ -175,6 +178,7 @@ if __name__ == "__main__":
     logging.info(f"Maximum energy: {args.emax}")
     logging.info(f"Maximum duration: {args.max_duration}")
     logging.info(f"Timestep: {args.timestep}")
+    logging.info(f"Constant timestep {args.constant_timestep}")
     logging.info(f"Dump: {args.dump}")
 
     res_dir = f"{args.res_dir}/eloss/{args.material}"
@@ -197,6 +201,7 @@ if __name__ == "__main__":
 
     timestep = args.timestep if args.timestep is not None else sim_info["timestep"]
     max_duration = args.max_duration if args.max_duration is not None else sim_info["impact_duration"]
+    max_displacement = args.max_displacement if args.max_displacement is not None else sim_info["max_displacement"]
 
     label = f"eloss_{material.label}"
     exp_io = defexp.ExperimentIO(
@@ -214,5 +219,6 @@ if __name__ == "__main__":
     execute(
             simulation, seed, args.count, emin, emax, atom_index, args.i,
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
-            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel
-            verbosity=2)
+            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel,
+            verbosity=2, adaptive_timestep=not args.constant_timestep,
+            max_displacement=max_displacement)

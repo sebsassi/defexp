@@ -1046,7 +1046,8 @@ class RecoilSimulation:
         df_name: str, lammps_args: dict, tf_name: str, pid: int,
         log_res: bool = False, test_frenkel: bool = True,
         zero_nonfrenkel: bool = True, smooth_count: int = 1,
-        seed: int = 1254623, verbosity: int = 1
+        seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = False,
+        max_displacement: float = 0.0005
     ) -> tuple[float, bool]:
         """
         Parameters
@@ -1160,6 +1161,9 @@ class RecoilSimulation:
         lmp.cmd.run(20, post=False)
         lmp.cmd.unfix("MYNPT")
         thermo_info = {key: [value] for key, value in lmp.last_thermo().items()}
+
+        if adaptive_timestep:
+            lmp.cmd.fix("MYDT", "all", "dt/reset", 10, self.timestep, "NULL", max_displacement)
 
         vel = velocity_from(
             energy*1.0e-9,

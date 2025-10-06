@@ -4,6 +4,7 @@
     "timestep": 0.0001,
     "relax_duration": 1.0,
     "impact_duration": 0.2,
+    "max_displacement": 0.0005,
     "emin": 0.0,
     "emax": 200.0
 }
