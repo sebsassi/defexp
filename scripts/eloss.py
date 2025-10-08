@@ -68,8 +68,7 @@ def random_energy_loss(
     else:
         aid = str(atom_type)
 
-    result_fname = (f"{recoil_simulation.io.res_dir}/"
-            f"random_energy_loss_{aid}_{aind}_{pid}.dat")
+    result_fname = recoil_simulation.io.output_file_name(aid, aind, pid)
     defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
 
     df_name, tf_name = recoil_simulation.lammps_io.create_data_and_thermo_file(pid)
@@ -113,7 +112,7 @@ def execute(
         for i, aind, atom_type in enumerate(zip(ainds, atom_types)):
             process_seed = abs(hash((seed, i))) if unique_seeds else seed
             args = (recoil_simulation, process_seed, count, emin, emax, aind, i)
-            processes.append(mp.Process(target=random_angle_thresholds, args=args, kwargs=kwargs))
+            processes.append(mp.Process(target=random_energy_loss, args=args, kwargs=kwargs))
         for p in processes: p.start()
         for p in processes: p.join()
     else:
@@ -134,32 +133,41 @@ if __name__ == "__main__":
     parser.add_argument("i", type=int, help="index of recoil atom")
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
-    parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
-    parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
-    parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
-    parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
-    parser.add_argument("--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
-    parser.add_argument("--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
-    parser.add_argument("--energy", type=float, default=None, help="fixed recoil energy")
+    parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
+    parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument("-D", "--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
+    parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
+    parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
     parser.add_argument("--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument("--emax", type=float, default=None, help="maximum recoil energy")
-    parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
-    parser.add_argument("--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
-    parser.add_argument("--dump", action="store_true", help="make periodic dumps of simulation state")
-    parser.add_argument("--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
-    parser.add_argument("--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument("--extra-label", type=str, default=None, help="extra label to attach to file names")
+    parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument("--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
+    parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
+    parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
+    parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
+    parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
+    parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
+    parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
+    parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
     args = parser.parse_args()
 
     timestamp = int(time.time())
     if (args.raw_seed):
         seed = args.seed
+    elif args.timeless_seed:
+        seed = abs(hash((args.seed, args.jid, args.i)))
     else:
         seed = abs(hash((args.seed, args.jid, args.i, timestamp)))
 
-    logging.basicConfig(
-            filename=f"thresholds_{args.material}_{args.jid:d}_{args.i:d}_{args.seed:d}_{args.count:d}.log",
-            level=logging.DEBUG)
+    if args.extra_label is None:
+        logging.basicConfig(
+                filename=f"eloss_{args.material}_{args.jid:d}_{args.i:d}_{args.seed:d}_{args.count:d}.log",
+                level=logging.DEBUG)
+    else:
+        logging.basicConfig(
+                filename=f"eloss_{args.material}_{args.extra_label}_{args.jid:d}_{args.i:d}_{args.seed:d}_{args.count:d}.log",
+                level=logging.DEBUG)
     logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
     logging.info(f"Material: {args.material}")
     logging.info(f"Job ID: {args.jid}")
@@ -180,6 +188,7 @@ if __name__ == "__main__":
     logging.info(f"Timestep: {args.timestep}")
     logging.info(f"Constant timestep {args.constant_timestep}")
     logging.info(f"Dump: {args.dump}")
+    logging.info(f"Timeless seed: {args.timeless_seed}")
 
     res_dir = f"{args.res_dir}/eloss/{args.material}"
     lmp_dir = f"{args.work_dir}/lammps_work"
@@ -203,7 +212,10 @@ if __name__ == "__main__":
     max_duration = args.max_duration if args.max_duration is not None else sim_info["impact_duration"]
     max_displacement = args.max_displacement if args.max_displacement is not None else sim_info["max_displacement"]
 
-    label = f"eloss_{material.label}"
+    if args.extra_label is None:
+        label = f"eloss_{material.label}"
+    else:
+        label = f"eloss_{material.label}_{args.extra_label}"
     exp_io = defexp.ExperimentIO(
             label, res_dir, thermo_dir, log_dir, save_thermo=["Time", "PotEng"])
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)

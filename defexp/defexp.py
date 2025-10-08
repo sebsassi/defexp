@@ -30,15 +30,6 @@ import ase.io.lammpsdata
 from voronoi_occupation import voronoi_occupation
 
 
-def file_ends_with_newline(filename: str) -> bool:
-    if os.path.isfile(filename) and os.path.getsize(filename) > 0:
-        with open(filename, "r") as f:
-            for line in f: pass
-        return line[-1] == "\n"
-    else:
-        return True
-
-
 def ensure_file_ends_with_new_line(filename: str, verbosity: int):
     if os.path.isfile(filename) and os.path.getsize(filename) > 0:
         with open(filename, "a+") as f:
@@ -56,32 +47,6 @@ def ensure_file_ends_with_new_line(filename: str, verbosity: int):
 def log_print(string: str, print_: bool = True):
     logging.info(string)
     if print_: print(string)
-
-
-def read_first_error_from_log(
-        log_file: typing.IO
-) -> tuple[str | None, str | None]:
-    """
-    Read first error message from a LAMMPS log stored in a string.
-
-    Parameters
-    ----------
-    log : str
-
-    Returns
-    -------
-    str | NoneType
-        First error message from the log file.
-    str | NoneType
-        Last command executed before the error.
-    """
-    error = None
-    for line in log.splitlines():
-        if line[:5] == "ERROR":
-            error = line
-            break
-    last_command = None if error is None else log_file.readline()
-    return error, last_command
 
 
 def read_lammps_data(filename: str, verbosity: int = 0) -> ase.Atoms:
@@ -574,18 +539,11 @@ class ExperimentIO:
         return f"{self.log_dir}/{self.label}_{pid}.log"
 
 
-    def _create_output_file_name(self, style: str, label: str, *args) -> str:
+    def output_file_name(self, *args, **kwargs) -> str:
         args_as_str = tuple(str(arg) for arg in args)
-        fname = "_".join((self.label, style, label) + args_as_str) + ".dat"
+        kwargs_as_str = tuple(str(v) for k, v in kwargs if v is not None)
+        fname = "_".join((self.label,) + args_as_str + kwargs_as_str) + ".dat"
         return f"{self.res_dir}/{fname}"
-
-
-    def eloss_file_name(self, label: str, *args) -> str:
-        return self._create_output_file_name("eloss", label, *args)
-
-
-    def frenkel_file_name(self, label: str, *args) -> str:
-        return self._create_output_file_name("frenkel", label, *args)
 
 
     def save_thermo_data(
@@ -593,23 +551,23 @@ class ExperimentIO:
         pid : int, verbosity: int = 1, binary: bool = True
     ):
         """
-        Save thermodynamic data marked to be saved by the save_thermo member variable.
+        save thermodynamic data marked to be saved by the save_thermo member variable.
 
-        Parameters
+        parameters
         ----------
         thermo_info : dict
-            Thermo data parsed from a LAMMPS log file.
+            thermo data parsed from a lammps log file.
         energy : float
-            Simulated recoil energy in GeV.
+            simulated recoil energy in gev.
         unitv : np.ndarray
-            Simulation direction as a unit vector.
+            simulation direction as a unit vector.
         aind : int
-            Index of the recoiling atom.
+            index of the recoiling atom.
         pid : int
-            ID of the saving process.
+            id of the saving process.
         verbosity : bool, optional
         binary : bool, optional
-            If true, save data as a .npz binary file. If false, save as a text file.
+            if true, save data as a .npz binary file. if false, save as a text file.
         """
         if self.save_thermo is not None:
             data = np.column_stack([thermo_info[key] for key in self.save_thermo])
@@ -621,49 +579,49 @@ class ExperimentIO:
             else:
                 fname = f"{self.thermo_dir}/{self.label}_thermo_{aind}_{pid}_{hash(energy)}.npz"
                 header = (
-                        f"energy = {energy:.16e} eV\n"
+                        f"energy = {energy:.16e} ev\n"
                         f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
                         f"{unitv[2]:.16e}]\n"
                         " ".join(self.save_thermo))
                 np.savetxt(fname, data, header=header)
             if verbosity > 1:
-                logging.debug(f"Saved thermodynamic data in {fname}.")
+                logging.debug(f"saved thermodynamic data in {fname}.")
 
 
 class LAMMPSIO:
     """
-    Class implementing LAMMPS IO operations.
+    class implementing lammps io operations.
 
-    Attributes
+    attributes
     ----------
     label : str
-        Label for the simulation.
+        label for the simulation.
     script_dir : str
-        Directory containing LAMMPS input scripts.
+        directory containing lammps input scripts.
     work_dir : str
-        Directory for files used by LAMMPS during the simulation.
+        directory for files used by lammps during the simulation.
     dump_dir : str
-        Directory for LAMMPS dump output.
+        directory for lammps dump output.
     """
     def __init__(self, label: str, work_dir: str, dump_dir: str):
         """
-        Class implementing LAMMPS IO operations.
+        class implementing lammps io operations.
 
-        Parameters
+        parameters
         ----------
         label : str
-            Label for the simulation.
+            label for the simulation.
         work_dir : str
-            Directory for files used by LAMMPS during the simulation.
+            directory for files used by lammps during the simulation.
         dump_dir : str
-            Directory for LAMMPS dump output.
+            directory for lammps dump output.
         """
         self.label = label
 
         if not os.path.isdir(work_dir):
-            raise FileNotFoundError(f"{work_dir} is not a directory")
+            raise filenotfounderror(f"{work_dir} is not a directory")
         if not os.path.isdir(dump_dir):
-            raise FileNotFoundError(f"{dump_dir} is not a directory")
+            raise filenotfounderror(f"{dump_dir} is not a directory")
 
         self.script_dir = f"{os.path.dirname(__file__)}/lammpsin"
         self.work_dir = work_dir
@@ -696,7 +654,7 @@ class LAMMPSIO:
 
     def write_pair_file(self, material: Material, verbosity: int = 0):
         """
-        Write a LAMMPS input script file for the pair interaction.
+        write a lammps input script file for the pair interaction.
         """
         fname = self.pair_file_name(material)
         with open(fname, "w") as f:
@@ -705,7 +663,7 @@ class LAMMPSIO:
             f.write(f"pair_style {material.pair_potential.style_name} {style_arg_str}\n")
             coeff_arg_str = " ".join(str(arg) for arg in material.pair_potential.coeff_args)
             f.write(f"pair_coeff * * \"{material.pair_potential.pot_file}\" {coeff_arg_str}\n")
-        if verbosity > 1: log_print(f"Wrote pair file {fname}.")
+        if verbosity > 1: log_print(f"wrote pair file {fname}.")
 
 
     def mass_file_name(self, material: Material) -> str:
@@ -714,20 +672,20 @@ class LAMMPSIO:
 
     def write_mass_file(self, material: Material, verbosity: int = 0):
         """
-        Write a file containing the atom masses in LAMMPS script format.
+        write a file containing the atom masses in lammps script format.
 
-        Parameters
+        parameters
         ----------
         verbosity : int, optional
         dir : str, optional
-            Directory where the file is written.
+            directory where the file is written.
         """
         fname = self.mass_file_name(material)
         with open(fname, "w") as f:
             f.truncate(0)
             for atom_type, props in material.atom_props.items():
                 f.write(f"mass {atom_type:d} {props['mass']:.10f}\n")
-        if verbosity > 1: log_print(f"Wrote mass file {fname}.")
+        if verbosity > 1: log_print(f"wrote mass file {fname}.")
 
 
     def data_file_name(self, lattice: Lattice, label: str) -> str:
@@ -736,33 +694,33 @@ class LAMMPSIO:
 
     def write_lammps_data(self, lattice: Lattice, label: str, verbosity: int = 0):
         """
-        Writes the lattice data into a file that can be read by LAMMPS.
+        writes the lattice data into a file that can be read by lammps.
 
-        Parameters
+        parameters
         ----------
         verbosity : int, optional
         """
         fname = self.data_file_name(lattice, label)
         ase.io.lammpsdata.write_lammps_data(
                 fname, lattice.atoms, atom_style="atomic")
-        if verbosity > 1: log_print(f"Wrote file {fname}.")
+        if verbosity > 1: log_print(f"wrote file {fname}.")
 
 
     def create_data_and_thermo_file(self, pid: int) -> tuple[str, str]:
         """
-        Creates data and thermo files if they don't already exist.
+        creates data and thermo files if they don't already exist.
 
-        Parameters
+        parameters
         ----------
         pid : int
-            Process ID.
+            process id.
 
-        Returns
+        returns
         -------
         df_name : str
-            Name of output data file.
+            name of output data file.
         tf_name : str
-            Name of thermo data file.
+            name of thermo data file.
         """
         name = f"{self.work_dir}/{self.label}_impact_{pid}"
         df_name = f"{name}.data"
