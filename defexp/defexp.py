@@ -1001,11 +1001,11 @@ class RecoilSimulation:
 
     def run(
         self, atom_type: int, aind: int, unitv: np.ndarray, energy: float,
-        df_name: str, lammps_args: dict, tf_name: str, pid: int,
-        log_res: bool = False, test_frenkel: bool = True,
-        zero_nonfrenkel: bool = True, smooth_count: int = 1,
-        seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = False,
-        max_displacement: float = 0.0005
+        df_name: str, tf_name: str, pid: int, log_res: bool = False,
+        test_frenkel: bool = True, zero_nonfrenkel: bool = True,
+        seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = True,
+        max_displacement: float = 0.0005, echo: typing.Optional[str] = None,
+        screen: typing.Optional[str] = None
     ) -> tuple[float, bool]:
         """
         Parameters
@@ -1020,13 +1020,11 @@ class RecoilSimulation:
             Recoil energy.
         df_name : str
             Name of output data file.
-        lammps_args : str
-            Command line arguments to LAMMPS executable.
         tf_name : str
             Name of thermo data file.
         pid : int
             Process ID.
-        log_res : bool, optional
+        log_res : bool, optional (default: False)
             If true, prints to log file whether a defect occurred in a given
             simulation.
         test_frenkel : bool, optional
@@ -1034,13 +1032,22 @@ class RecoilSimulation:
         zero_nonfrenkel : bool, optional
             If true, change in potential energy is zeroed if no Frenkel defects
             are detected.
-        smooth_count : int, optional
-            The final potential energy value used to calculate the change in
-            energy is the mean potential energy of `smooth_count` potential
-            energy values.
         seed : int, optional
             Seed for the random number generator that determines the atom
             thermal velocities.
+        verbosity : int, optional
+            Verbosity of logging.
+        adaptive_timestep : bool, optional
+            Use an adaptive timestep in the simulation.
+        max_displacement : float, optional
+            Maximum distance (in simulation units) that atoms are allowed to
+            move in a single time step.
+        echo : str, optional
+            LAMMPS echo argument: "none", "screen", "log", or "both". See
+            the LAMMPS documentation for more.
+        screen : str, optional
+            LAMMPS screen argument: "none" or a file name. See the LAMMPS
+            documentation for more.
 
         Returns
         -------
@@ -1052,6 +1059,12 @@ class RecoilSimulation:
         """
 
         shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
+
+        cmdargs = ["-log", self.lammps_io.log_file_name(uid=pid)]
+        if echo is not None:
+            cmdargs += ["-echo", echo]
+        if screen is not None:
+            cmdargs += ["-screen", screen]
 
         cmdargs = ["-log", self.lammps_io.log_file_name(uid=pid), "-echo", "both"]
         if self.screen is not None:

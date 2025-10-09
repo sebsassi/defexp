@@ -41,7 +41,7 @@ def random_energy_loss(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, aind: int, pid: int,
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
-    screen: typing.Optional[str] = None, verbosity: int = 1, **kwargs
+    verbosity: int = 1, **kwargs
 ):
     print(verbosity, kwargs)
     rng = np.random.default_rng(seed)
@@ -73,10 +73,6 @@ def random_energy_loss(
 
     df_name, tf_name = recoil_simulation.lammps_io.create_data_and_thermo_file(pid)
 
-    lammps_args = {"log": tf_name}
-    if screen is not None:
-        lammps_args["screen"] = screen
-
     for i in range(count):
         if verbosity > 1:
             defexp.log_print(
@@ -86,8 +82,8 @@ def random_energy_loss(
             defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
 
         depot, frenkel_defect = recoil_simulation.run(
-                atom_type, aind, unitv[i], energies[i], df_name, lammps_args,
-                tf_name, pid, verbosity=verbosity, **kwargs)
+                atom_type, aind, unitv[i], energies[i], df_name, tf_name, pid,
+                verbosity=verbosity, echo="both", **kwargs)
 
         with open(result_fname, "a") as f:
             if verbosity > 2:
@@ -146,6 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
+    parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
     parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
@@ -228,9 +225,11 @@ if __name__ == "__main__":
     atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
     logging.info(f"Atom index: {atom_index}")
 
+    screen = None if args.screen else "none"
+
     execute(
             simulation, seed, args.count, emin, emax, atom_index, args.i,
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
-            test_frenkel=True, smooth_count=10, zero_nonfrenkel=args.zero_nonfrenkel,
+            test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=2, adaptive_timestep=not args.constant_timestep,
-            max_displacement=max_displacement)
+            max_displacement=max_displacement, screen=screen)
