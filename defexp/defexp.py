@@ -945,6 +945,7 @@ class RecoilSimulation:
         """
         self.lattice = lattice
         self.defect_threshold = defect_threshold
+        self.fit_window = fit_window
         self.fit_len = int(fit_window/(timestep*thermo_interval))
         self.max_batch = int(max_duration/(timestep*thermo_interval))
         self.max_step = int(max_duration/timestep)
@@ -1169,8 +1170,16 @@ class RecoilSimulation:
             for key, value in lmp.last_thermo().items():
                 thermo_info[key].append(value)
 
-            time_segment = np.array(thermo_info["Time"][-self.fit_len:])
-            pot_segment = np.array(thermo_info["PotEng"][-self.fit_len:])
+            indices = np.argwhere(thermo_info["Time"][-1] - thermo_info["Time"] > self.fit_window)
+            if (indices.size == 0):
+                segment_start = 0
+            elif (thermo_info["Time"].size < 200):
+                segment_start = indices[-1]
+            else:
+                segment_start = min(indices[-1], size - 200)
+
+            time_segment = np.array(thermo_info["Time"][segment_start:])
+            pot_segment = np.array(thermo_info["PotEng"][segment_start:])
 
             try:
                 popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
