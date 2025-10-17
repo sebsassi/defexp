@@ -18,6 +18,6 @@
     "pair_potential": {
         "style_name": "tersoff/zbl",
         "pot_file": "WCH.tersoff.zbl",
-        "style_args": []
+        "style_args": {}
     }
 }
