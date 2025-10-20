@@ -1004,7 +1004,7 @@ class RecoilSimulation:
         test_frenkel: bool = True, zero_nonfrenkel: bool = True,
         seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = True,
         max_displacement: float = 0.0005, echo: typing.Optional[str] = None,
-        screen: typing.Optional[str] = None
+        screen: typing.Optional[str] = None, uid: typing.Optional[int] = None
     ) -> tuple[float, bool]:
         """
         Parameters
@@ -1059,17 +1059,13 @@ class RecoilSimulation:
 
         shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
 
-        cmdargs = ["-log", self.lammps_io.log_file_name(uid=pid)]
-        if echo is not None:
-            cmdargs += ["-echo", echo]
-        if screen is not None:
-            cmdargs += ["-screen", screen]
-
-        cmdargs = ["-log", self.lammps_io.log_file_name(uid=pid), "-echo", "both"]
+        cmdargs = ["-log", self.lammps_io.log_file_name(uid=uid), "-echo", "both"]
         if self.screen is not None:
             cmdargs += ["-screen", self.screen]
         lmp = lammps.lammps(cmdargs=cmdargs)
         lmp = lammps.lammps()
+
+        lmp.cmd.log(self.lammps_io.log_file_name(uid=uid));
 
         lmp.cmd.units("metal")
         lmp.cmd.atom_style("atomic")

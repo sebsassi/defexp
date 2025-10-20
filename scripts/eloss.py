@@ -232,4 +232,4 @@ if __name__ == "__main__":
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=2, adaptive_timestep=not args.constant_timestep,
-            max_displacement=max_displacement, screen=screen)
+            max_displacement=max_displacement, screen=screen, uid=args.jid)
