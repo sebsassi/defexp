@@ -946,9 +946,7 @@ class RecoilSimulation:
         self.lattice = lattice
         self.defect_threshold = defect_threshold
         self.fit_window = fit_window
-        self.fit_len = int(fit_window/(timestep*thermo_interval))
-        self.max_batch = int(max_duration/(timestep*thermo_interval))
-        self.max_step = int(max_duration/timestep)
+        self.max_duration = max_duration
         self.poterr = poterr
 
         # Logging
@@ -1132,7 +1130,7 @@ class RecoilSimulation:
                 "aniso", 0.0, 0.0, 1.0)
         lmp.cmd.run(20, post=False)
         lmp.cmd.unfix("MYNPT")
-        thermo_info = {key: [value] for key, value in lmp.last_thermo().items()}
+        thermo_info = {key: np.array([value]) for key, value in lmp.last_thermo().items()}
 
         if adaptive_timestep:
             lmp.cmd.fix("MYDT", "all", "dt/reset", 10, self.timestep, "NULL", max_displacement)
@@ -1146,17 +1144,15 @@ class RecoilSimulation:
                 "temp", self.temperature, self.temperature, 100.0*self.timestep)
         lmp.cmd.fix("CONSERVE", "INTERIOR_ATOMS", "nve")
 
-        max_batch = self.max_step//10
-
         def fit_func(x, a, b, c):
             return a*np.exp(-b*x) + c
 
         lmp.cmd.run(self.thermo_interval, post=False)
-        for i in range(self.fit_len):
+        while thermo_info["Time"][-1] < min(self.fit_window + 0.5, self.max_duration) or thermo_info["Time"].size < 200:
             lmp.cmd.run(self.thermo_interval, pre=False, post=False)
 
             for key, value in lmp.last_thermo().items():
-                thermo_info[key].append(value)
+                thermo_info[key] = np.append(thermo_info[key], value)
 
         pinit = [
             np.max(thermo_info["PotEng"]) - thermo_info["PotEng"][-1],
@@ -1164,25 +1160,26 @@ class RecoilSimulation:
             thermo_info["PotEng"][-1]
         ]
 
-        for i in range(max_batch):
+        while (thermo_info["Time"][-1] < self.max_duration):
             lmp.cmd.run(self.thermo_interval, pre=False, post=False)
 
             for key, value in lmp.last_thermo().items():
-                thermo_info[key].append(value)
+                thermo_info[key] = np.append(thermo_info[key], value)
 
-            indices = np.argwhere(thermo_info["Time"][-1] - thermo_info["Time"] > self.fit_window)
+            indices = np.squeeze(np.argwhere(thermo_info["Time"][-1] - thermo_info["Time"] > self.fit_window))
             if (indices.size == 0):
                 segment_start = 0
-            elif (thermo_info["Time"].size < 200):
-                segment_start = indices[-1]
             else:
-                segment_start = min(indices[-1], size - 200)
+                segment_start = min(indices[-1], thermo_info["Time"].size - 200)
 
             time_segment = np.array(thermo_info["Time"][segment_start:])
             pot_segment = np.array(thermo_info["PotEng"][segment_start:])
 
+            last_asymptote = pinit[2]
             try:
                 popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
+                perr = np.sqrt(np.diag(pcov))
+                print(perr)
                 pinit = popt
             except RuntimeError:
                 pinit = [
@@ -1192,9 +1189,10 @@ class RecoilSimulation:
                 ]
                 continue
 
-            if np.abs(pinit[2] - pot_segment[-1]) < self.poterr:
+            if np.abs(pinit[2] - pot_segment[-1]) < self.poterr and perr[2] < self.poterr:
+                if thermo_info["Time"][-1] < 1.5*self.fit_window:
+                    continue
                 break
-
 
         positions = lmp.numpy.extract_atom("x")
 
