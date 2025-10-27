@@ -1145,7 +1145,11 @@ class RecoilSimulation:
 
         lmp.cmd.run(self.thermo_interval, post=False)
         while thermo_info["Time"][-1] < min(self.fit_window + 0.5, self.max_duration) or thermo_info["Time"].size < 200:
-            lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+            try:
+                lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+            except Exception as e:
+                self.io.save_thermo_data(thermo_info, energy, unitv, aind, pid)
+                raise e
 
             for key, value in lmp.last_thermo().items():
                 thermo_info[key] = np.append(thermo_info[key], value)
@@ -1157,7 +1161,11 @@ class RecoilSimulation:
         ]
 
         while (thermo_info["Time"][-1] < self.max_duration):
-            lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+            try:
+                lmp.cmd.run(self.thermo_interval, pre=False, post=False)
+            except Exception as e:
+                self.io.save_thermo_data(thermo_info, energy, unitv, aind, pid)
+                raise e
 
             for key, value in lmp.last_thermo().items():
                 thermo_info[key] = np.append(thermo_info[key], value)
