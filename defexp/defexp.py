@@ -1129,7 +1129,7 @@ class RecoilSimulation:
         thermo_info = {key: np.array([value]) for key, value in lmp.last_thermo().items()}
 
         if adaptive_timestep:
-            lmp.cmd.fix("MYDT", "all", "dt/reset", 10, self.timestep, "NULL", max_displacement)
+            lmp.cmd.fix("MYDT", "all", "dt/reset", 10, "NULL", self.timestep, max_displacement)
 
         vel = velocity_from(
             energy*1.0e-9,
@@ -1184,7 +1184,14 @@ class RecoilSimulation:
                 popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
                 perr = np.sqrt(np.diag(pcov))
                 print(perr)
-                pinit = popt
+                if (np.all(np.isfinite(popt)) and np.all(np.isfinite(perr))):
+                    pinit = popt
+                else:
+                    pinit = [
+                        np.max(thermo_info["PotEng"]) - thermo_info["PotEng"][-1],
+                        1.0,
+                        thermo_info["PotEng"][-1]
+                    ]
             except RuntimeError:
                 pinit = [
                     np.max(thermo_info["PotEng"]) - thermo_info["PotEng"][-1],

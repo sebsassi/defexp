@@ -120,6 +120,9 @@ def angle_pair(arg: str):
     pair = arg.split(",")
     return float(pair[0]), float(pair[1])
 
+def str_list(arg: str):
+    return arg.split(",")
+
 if __name__ == "__main__":
     print("Running eloss.py")
 
@@ -134,15 +137,16 @@ if __name__ == "__main__":
     parser.add_argument("-D", "--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
     parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
     parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
-    parser.add_argument("--emin", type=float, default=None, help="minimum recoil energy")
-    parser.add_argument("--emax", type=float, default=None, help="maximum recoil energy")
-    parser.add_argument("--extra-label", type=str, default=None, help="extra label to attach to file names")
+    parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
+    parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
+    parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
-    parser.add_argument("--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
-    parser.add_argument("--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
+    parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
+    parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
+    parser.add_argument(      "--thermo", type=str_list, default=["Time","PotEng"], help="thermo quantities to save as a comma separated list")
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
     parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
@@ -214,7 +218,7 @@ if __name__ == "__main__":
     else:
         label = f"eloss_{material.label}_{args.extra_label}"
     exp_io = defexp.ExperimentIO(
-            label, res_dir, thermo_dir, log_dir, save_thermo=["Time", "PotEng"])
+            label, res_dir, thermo_dir, log_dir, save_thermo=args.thermo)
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RecoilSimulation(
