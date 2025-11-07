@@ -900,7 +900,8 @@ class RecoilSimulation:
         dump: bool = False, verbosity: int = 1, time_lammps: bool = False,
         timestep: float = 0.0002, max_duration: float = 1, temperature: float = 0.04,
         border_thickness: float = 6.0, defect_threshold: float = 5,
-        fit_window: float = 1.0, thermo_interval: int = 10, poterr: float = 0.5
+        fit_window: float = 1.0, thermo_interval: int = 10, poterr: float = 0.5,
+        screen: typing.Optional[str] = None, echo: str = "both"
     ):
         """
         Parameters
@@ -942,6 +943,12 @@ class RecoilSimulation:
         poterr : float, optional
             Convergence criterion: difference between the last computed
             potential energy and the asymptotic potential energy of the fit.
+        echo : str, optional
+            LAMMPS echo argument: "none", "screen", "log", or "both". See
+            the LAMMPS documentation for more.
+        screen : str, optional
+            LAMMPS screen argument: "none" or a file name. See the LAMMPS
+            documentation for more.
         """
         self.lattice = lattice
         self.defect_threshold = defect_threshold
@@ -961,7 +968,8 @@ class RecoilSimulation:
 
         # LAMMPS
         self.lammps_threads = lammps_threads
-        self.screen = None
+        self.screen = screen
+        self.echo = echo
 
         # LAMMPS
         self.timestep = timestep
@@ -1003,8 +1011,7 @@ class RecoilSimulation:
         df_name: str, tf_name: str, pid: int, log_res: bool = False,
         test_frenkel: bool = True, zero_nonfrenkel: bool = True,
         seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = True,
-        max_displacement: float = 0.0005, echo: typing.Optional[str] = None,
-        screen: typing.Optional[str] = None, uid: typing.Optional[int] = None
+        max_displacement: float = 0.0005, uid: typing.Optional[int] = None
     ) -> tuple[float, bool]:
         """
         Parameters
@@ -1041,12 +1048,6 @@ class RecoilSimulation:
         max_displacement : float, optional
             Maximum distance (in simulation units) that atoms are allowed to
             move in a single time step.
-        echo : str, optional
-            LAMMPS echo argument: "none", "screen", "log", or "both". See
-            the LAMMPS documentation for more.
-        screen : str, optional
-            LAMMPS screen argument: "none" or a file name. See the LAMMPS
-            documentation for more.
 
         Returns
         -------
@@ -1059,11 +1060,10 @@ class RecoilSimulation:
 
         shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
 
-        cmdargs = ["-log", self.lammps_io.log_file_name(uid=uid), "-echo", "both"]
+        cmdargs = ["-log", self.lammps_io.log_file_name(uid=uid)]
         if self.screen is not None:
-            cmdargs += ["-screen", self.screen]
+            cmdargs += ["-screen", "none"]
         lmp = lammps.lammps(cmdargs=cmdargs)
-        lmp = lammps.lammps()
 
         lmp.cmd.log(self.lammps_io.log_file_name(uid=uid));
 

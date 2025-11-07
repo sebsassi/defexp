@@ -83,7 +83,7 @@ def random_energy_loss(
 
         depot, frenkel_defect = recoil_simulation.run(
                 atom_type, aind, unitv[i], energies[i], df_name, tf_name, pid,
-                verbosity=verbosity, echo="both", **kwargs)
+                verbosity=verbosity, **kwargs)
 
         with open(result_fname, "a") as f:
             if verbosity > 2:
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     sim_info = defexp.load_sim_info(f"{args.config_dir}/sim_info", args.material)
 
     lattice = defexp.Lattice(material, sim_info["repeat"])
-    
+
     if args.energy is not None:
         emin = args.energy
         emax = args.energy
@@ -221,19 +221,20 @@ if __name__ == "__main__":
             label, res_dir, thermo_dir, log_dir, save_thermo=args.thermo)
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
+    screen = None if args.screen else "none"
     simulation = defexp.RecoilSimulation(
             lattice, exp_io, lammps_io, dump=args.dump, time_lammps=True,
-            timestep=timestep, max_duration=max_duration, temperature=sim_info["temperature"])
+            timestep=timestep, max_duration=max_duration, temperature=sim_info["temperature"],
+            screen=screen)
 
     ainds = lattice.indices_in_central_cell(lammps=False)
     atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
     logging.info(f"Atom index: {atom_index}")
 
-    screen = None if args.screen else "none"
 
     execute(
             simulation, seed, args.count, emin, emax, atom_index, args.i,
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=2, adaptive_timestep=not args.constant_timestep,
-            max_displacement=max_displacement, screen=screen, uid=args.jid)
+            max_displacement=max_displacement, uid=args.jid)
