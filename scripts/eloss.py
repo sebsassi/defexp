@@ -141,6 +141,7 @@ if __name__ == "__main__":
     parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
     parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
+    parser.add_argument("-i", "--index-override", type=int, default=None, help="override the recoil atom index")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
@@ -229,7 +230,10 @@ if __name__ == "__main__":
             screen=screen)
 
     ainds = lattice.indices_in_central_cell(lammps=False)
-    atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
+    if args.index_override is None:
+        atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
+    else:
+        atom_index = ainds[args.index_override % material.unit_cell_atoms.shape[0]]
     logging.info(f"Atom index: {atom_index}")
 
 
