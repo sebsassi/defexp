@@ -1,10 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=eloss
-#SBATCH -M kale
-#SBATCH -p short
 #SBATCH -c 1
 #SBATCH -n 1
-#SBATCH -t 23:00:00
 #SBATCH --mem-per-cpu=600
 #SBATCH --error="/wrk-kappa/users/%u/err/eloss-%j.err"
 #SBATCH --output="/wrk-kappa/users/%u/out/eloss-%j.out"
