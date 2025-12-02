@@ -46,11 +46,12 @@ def random_energy_loss(
     print(verbosity, kwargs)
     rng = np.random.default_rng(seed)
 
-    if direction == (0.0, 0.0) and max_angle == np.pi:
+    if direction[0] == 0.0 and direction[1] == 0.0 and max_angle == np.pi:
         pa, az = defexp.uniform_angles(rng, count)
         unitv = defexp.angles_to_vec(pa, az)
     elif max_angle == 0.0:
-        pa, az = direction
+        pa = direction[0]*np.ones(count)
+        az = direction[1]*np.ones(count)
         unitv = defexp.angles_to_vec(pa, az)
     else:
         pa, az, unitv = random_directions(rng, central_dir, max_angle, count)
@@ -134,7 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("count", type=int, help="number of recoil experiments")
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
-    parser.add_argument("-D", "--direction", type=angle_pair, default=(0.0, 0.0), help="recoil directon as comma separated angle pair alt,az in radians")
+    parser.add_argument("-D", "--direction", type=float, nargs=2, default=[0.0, 0.0], help="recoil directon as an angle pair ALT AZ in radians")
     parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
     parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
     parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
@@ -146,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
-    parser.add_argument(      "--thermo", type=str_list, default=["Time","PotEng"], help="thermo quantities to save as a comma separated list")
+    parser.add_argument(      "--thermo", type=str, nargs="+", default=["Time","PotEng"], help="list of thermo quantities to save")
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
     parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
