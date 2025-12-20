@@ -629,8 +629,9 @@ class LAMMPSIO:
 
 
     def empty_dump_dir(self):
-        os.remove(glob.glob(f"{self.dump_dir}/*.dump"))
-        os.remove(glob.glob(f"{self.dump_dir}/*.dump.gz"))
+        fnames = glob.glob(f"{self.dump_dir}/*.dump") + glob.glob(f"{self.dump_dir}/*.dump.gz")
+        for f in fnames:
+            os.remove(f)
 
 
     def relax_script_path(self) -> str:
@@ -1058,8 +1059,6 @@ class RecoilSimulation:
             Boolean of whether a Frenkel defect was detected in the simulation.
         """
 
-        shutil.copy2(self.lammps_io.data_file_name(self.lattice, "relaxed"), df_name)
-
         cmdargs = ["-log", self.lammps_io.log_file_name(uid=uid)]
         if self.screen is not None:
             cmdargs += ["-screen", "none"]
@@ -1071,7 +1070,7 @@ class RecoilSimulation:
         lmp.cmd.atom_style("atomic")
         lmp.cmd.boundary("p", "p", "p")
 
-        lmp.cmd.read_data(df_name)
+        lmp.cmd.read_data(self.lammps_io.data_file_name(self.lattice, "relaxed"))
 
         self.lattice.material.set_masses(lmp)
         self.lattice.material.pair_potential.set(lmp)
@@ -1105,8 +1104,7 @@ class RecoilSimulation:
 
         if self.dump:
             lmp.cmd.dump("MYDUMP", "all", "custom/gz",
-                    max(self.max_step//1000, 1),
-                    f"{self.lammps_io.dump_dir}/*.dump.gz",
+                    10, f"{self.lammps_io.dump_dir}/*.dump.gz",
                     "id", "type", "x", "y", "z", "c_EPA", "c_EKA",
                     "vx", "vy", "vz")
             lmp.cmd.dump_modify("MYDUMP", pad=8)
@@ -1127,6 +1125,8 @@ class RecoilSimulation:
         lmp.cmd.run(20, post=False)
         lmp.cmd.unfix("MYNPT")
         thermo_info = {key: np.array([value]) for key, value in lmp.last_thermo().items()}
+
+        starting_positions = lmp.numpy.extract_atom("x")
 
         if adaptive_timestep:
             lmp.cmd.fix("MYDT", "all", "dt/reset", 10, "NULL", self.timestep, max_displacement)
@@ -1211,9 +1211,7 @@ class RecoilSimulation:
 
         has_frenkel_defect = False
         if test_frenkel:
-            has_frenkel_defect = is_defect_frenkel(
-                self.relaxed_atoms.positions[self.frenkel_indices],
-                positions[self.frenkel_indices])
+            has_frenkel_defect = is_defect_frenkel(starting_positions, positions)
             if verbosity > 2:
                 log_print(
                     "Tested Frenkel defect. Frenkel defects:", has_frenkel_defect)

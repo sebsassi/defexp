@@ -100,7 +100,6 @@ def random_energy_loss(
 def execute(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, aind: int, pid: int, parallel: bool = False,
-    direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     unique_seeds: bool = True, **kwargs
 ):
     if parallel:
