@@ -1068,6 +1068,7 @@ class RecoilSimulation:
 
         lmp.cmd.units("metal")
         lmp.cmd.atom_style("atomic")
+        lmp.cmd.atom_modify(map="yes")
         lmp.cmd.boundary("p", "p", "p")
 
         lmp.cmd.read_data(self.lammps_io.data_file_name(self.lattice, "relaxed"))
@@ -1102,6 +1103,8 @@ class RecoilSimulation:
 
         lmp.cmd.compute("EP", "all", "pe")
 
+        lmp.cmd.compute("OCCUPATION", "all", "voronoi/atom", "occupation")
+
         if self.dump:
             lmp.cmd.dump("MYDUMP", "all", "custom/gz",
                     10, f"{self.lammps_io.dump_dir}/*.dump.gz",
@@ -1126,7 +1129,9 @@ class RecoilSimulation:
         lmp.cmd.unfix("MYNPT")
         thermo_info = {key: np.array([value]) for key, value in lmp.last_thermo().items()}
 
-        starting_positions = lmp.numpy.extract_atom("x")
+        initial_occupation = lmp.numpy.extract_compute("OCCUPATION", lammps.LMP_STYLE_ATOM, lammps.LMP_TYPE_ARRAY)
+        if np.any(initial_occupation != 1):
+            raise RuntimeError("Unexpected Frenkel defects in initial configuration")
 
         if adaptive_timestep:
             lmp.cmd.fix("MYDT", "all", "dt/reset", 10, "NULL", self.timestep, max_displacement)
@@ -1205,36 +1210,32 @@ class RecoilSimulation:
                     continue
                 break
 
-        positions = lmp.numpy.extract_atom("x")
+        occupation = lmp.numpy.extract_compute("OCCUPATION", lammps.LMP_STYLE_ATOM, lammps.LMP_TYPE_ARRAY)
 
         self.io.save_thermo_data(thermo_info, energy, unitv, aind, pid)
 
-        has_frenkel_defect = False
-        if test_frenkel:
-            has_frenkel_defect = is_defect_frenkel(starting_positions, positions)
-            if verbosity > 2:
-                log_print(
-                    "Tested Frenkel defect. Frenkel defects:", has_frenkel_defect)
+        has_frenkel_defect = np.any(occupation != 1)
+        if verbosity > 2:
+            log_print(
+                "Tested Frenkel defect. Frenkel defects:", has_frenkel_defect)
 
         start_epot = thermo_info["PotEng"][0]
         end_epot = pinit[2]
 
-        zero_condition = ((not has_frenkel_defect)
-                          and test_frenkel and zero_nonfrenkel)
+        zero_condition = zero_nonfrenkel and not has_frenkel_defect
         depot = 0 if zero_condition else (end_epot - start_epot)
 
         if verbosity > 1:
             log_print(f"Checked potential energy. Difference: {depot}")
 
         has_epot_defect = depot > self.defect_threshold
-        if log_res and test_frenkel:
+        if log_res:
             log_print(
                 f"Frenkel defect: {has_frenkel_defect}\n"
                     f"Epot defect: {has_epot_defect}")
 
-        if test_frenkel:
-            self.check_for_anomalous_defect(
-                has_frenkel_defect, has_epot_defect, pid, unitv, energy, verbosity)
+        self.check_for_anomalous_defect(
+            has_frenkel_defect, has_epot_defect, pid, unitv, energy, verbosity)
 
         return depot, has_frenkel_defect
 
