@@ -368,7 +368,7 @@ class Lattice:
     def central_cell(self) -> tuple[int]:
         """
         Integer coordinates of the innermost lattice cell.
-        
+
         Returns
         -------
         tuple[int]
@@ -1188,7 +1188,6 @@ class RecoilSimulation:
             try:
                 popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
                 perr = np.sqrt(np.diag(pcov))
-                print(perr)
                 if (np.all(np.isfinite(popt)) and np.all(np.isfinite(perr))):
                     pinit = popt
                 else:

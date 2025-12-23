@@ -43,7 +43,6 @@ def random_energy_loss(
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     verbosity: int = 1, **kwargs
 ):
-    print(verbosity, kwargs)
     rng = np.random.default_rng(seed)
 
     if direction[0] == 0.0 and direction[1] == 0.0 and max_angle == np.pi:
