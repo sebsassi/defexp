@@ -995,7 +995,7 @@ class RecoilSimulation:
         if has_defect_anomaly:
             log_file_name = self.io.log_file_name(pid)
             if verbosity > 2:
-                logging.debug(f"Opened file {logfname} in append mode.")
+                logging.debug(f"Opened file {log_file_name} in append mode.")
             with open(log_file_name, "a") as log_file:
                 log_file.write(
                     f"direction = [{unitv[0]:.16e}, {unitv[1]:.16e}, "
@@ -1175,19 +1175,16 @@ class RecoilSimulation:
             for key, value in lmp.last_thermo().items():
                 thermo_info[key] = np.append(thermo_info[key], value)
 
-            indices = np.squeeze(np.argwhere(thermo_info["Time"][-1] - thermo_info["Time"] > self.fit_window))
-            if (indices.size == 0):
-                segment_start = 0
-            else:
-                segment_start = min(indices[-1], thermo_info["Time"].size - 200)
+            indices = np.squeeze(np.argwhere(thermo_info["Time"][-1] - thermo_info["Time"] < self.fit_window))
 
-            time_segment = np.array(thermo_info["Time"][segment_start:])
-            pot_segment = np.array(thermo_info["PotEng"][segment_start:])
+            time_segment = np.array(thermo_info["Time"][indices])
+            pot_segment = np.array(thermo_info["PotEng"][indices])
 
-            last_asymptote = pinit[2]
             try:
                 popt, pcov = opt.curve_fit(fit_func, time_segment, pot_segment, p0=pinit)
                 perr = np.sqrt(np.diag(pcov))
+                if verbosity > 2:
+                    log_print(f"Exponential fit: [{popt[0]:.5e} +- {perr[0]:.5e}, {popt[1]:.5e} +- {perr[1]:.5e}, {popt[2]:.5e} +- {perr[2]:.5e}]")
                 if (np.all(np.isfinite(popt)) and np.all(np.isfinite(perr))):
                     pinit = popt
                 else:

@@ -150,6 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
     parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
+    parser.add_argument("-v", "--verbosity", type=int, default=2, help="verbosity of output")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
     args = parser.parse_args()
 
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     simulation = defexp.RecoilSimulation(
             lattice, exp_io, lammps_io, dump=args.dump, time_lammps=True,
             timestep=timestep, max_duration=max_duration, temperature=sim_info["temperature"],
-            screen=screen)
+            screen=screen, verbosity=args.verbosity)
 
     ainds = lattice.indices_in_central_cell(lammps=False)
     if args.index_override is None:
@@ -239,5 +240,5 @@ if __name__ == "__main__":
             simulation, seed, args.count, emin, emax, atom_index, args.i,
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
-            verbosity=2, adaptive_timestep=not args.constant_timestep,
+            verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
             max_displacement=max_displacement, uid=args.jid)
