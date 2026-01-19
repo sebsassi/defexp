@@ -81,7 +81,7 @@ def main():
         eloss = data["eloss"]
         emax = np.max(eloss)
         bounds = [
-            (0.0, np.inf),
+            (0.5, 100.0),
             (0.0, 1.0),
             (3.0, 8.0),
             (0.01, emax),
@@ -116,7 +116,7 @@ def main():
         print(f"Processing {filename}")
         for i in tqdm.tqdm(range(histogram.shape[0])):
             # res = opt.shgo(opt_f_df, args=(eloss, histogram[i]), bounds=bounds, constraints=ineq_constr, options={"jac": True})
-            res = opt.shgo(opt_f, args=(eloss, histogram[i]), bounds=bounds, constraints=linear_constraints, minimizer_kwargs={"method": "COBYQA"})
+            res = opt.shgo(opt_f, args=(eloss[:-1], histogram[i]), bounds=bounds, constraints=linear_constraints, minimizer_kwargs={"method": "COBYQA"})
             params.append(res.x)
 
         params = np.array(params)
@@ -126,13 +126,13 @@ def main():
         ax[0].imshow(histogram.T, aspect="auto")
         ax[1].imshow(histogram_fit.T, aspect="auto")
 
-        line0, = ax[2].plot(energies, params[:,0], label="$\\tau$", color="white", linestyle="--")
-        line1, = ax[2].plot(energies, params[:,1], label="$p_1$", linestyle="-")
-        ax[2].plot(energies, params[:,2], label="$E_1$", color=line1.get_color(), linestyle="--")
-        ax[2].plot(energies, params[:,3], label="$\\sigma_1$", color=line1.get_color(), linestyle=":")
-        line2, = ax[2].plot(energies, params[:,4], label="$p_2$", linestyle="-")
-        ax[2].plot(energies, params[:,5], label="$E_2$", color=line2.get_color(), linestyle="--")
-        ax[2].plot(energies, params[:,6], label="$\\sigma_2$", color=line2.get_color(), linestyle=":")
+        line0, = ax[2].plot(energies[:-1], params[:,0], label="$\\tau$", color="white", linestyle="--")
+        line1, = ax[2].plot(energies[:-1], params[:,1], label="$p_1$", linestyle="-")
+        ax[2].plot(energies[:-1], params[:,2], label="$E_1$", color=line1.get_color(), linestyle="--")
+        ax[2].plot(energies[:-1], params[:,3], label="$\\sigma_1$", color=line1.get_color(), linestyle=":")
+        line2, = ax[2].plot(energies[:-1], params[:,4], label="$p_2$", linestyle="-")
+        ax[2].plot(energies[:-1], params[:,5], label="$E_2$", color=line2.get_color(), linestyle="--")
+        ax[2].plot(energies[:-1], params[:,6], label="$\\sigma_2$", color=line2.get_color(), linestyle=":")
         plt.legend()
         plt.show()
 

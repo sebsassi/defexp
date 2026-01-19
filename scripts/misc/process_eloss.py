@@ -16,7 +16,6 @@ def create_histograms(
     x: typing.Optional[np.ndarray] = None,
     bins: typing.Optional[tuple[int,int]] = None,
     bin_width: float = 1.0,
-    density: bool = True
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray | dict[typing.Any, np.ndarray]]:
     if isinstance(data, dict):
         xmax = np.max([np.max(value[:,2]) for value in data.values()])
@@ -32,17 +31,19 @@ def create_histograms(
         bins[1] = int(np.ceil(ymax/bin_width)) if bins[1] is None else bins[1]
 
     if x is None:
-        x = np.linspace(0.0, xmax, bins[0])
+        x = np.linspace(0.0, xmax, bins[0] + 1)
     else:
         bins[0] = x
 
     bin_ranges = [[x[0], x[-1]], [0.0, ymax]]
     if isinstance(data, dict):
-        histogram = {key: np.histogram2d(value[:,2],value[:,3], bins=bins, range=bin_ranges, density=density)[0] for key, value in data.items()}
+        histogram = {key: np.histogram2d(value[:,2], value[:,3], bins=bins, range=bin_ranges, density=False) for key, value in data.items()}
+        histogram = {key: hist[0]/np.maximum(np.sum(hist[0], axis=1), 1)[:,np.newaxis]/np.diff(hist[2]) for key, hist in histogram.items()}
     else:
-        histogram = np.histogram2d(data[:,2],data[:,3])[0]
+        histogram = np.histogram2d(data[:,2], data[:,3])
+        histogram = histogram[0]/np.maximum(np.sum(histogram[0], axis=1), 1)[:,np.newaxis]/np.diff(hist[2])
 
-    y = np.linspace(0.0, ymax, bins[1])
+    y = np.linspace(0.0, ymax, bins[1] + 1)
     return x, y, histogram
 
 
@@ -57,13 +58,13 @@ def energy_loss_statistics(
             emax = np.max([np.max(value[:,2]) for value in data.values()])
         else:
             emax = np.max(data[:,2])
-        energies = np.linspace(0.0, emax, int(np.ceil(emax/bin_width)))
+        energies = np.linspace(0.0, emax, int(np.ceil(emax/bin_width)) + 1)
 
     if isinstance(data, dict):
-        return {key: average_energy_loss(value) for key, value in data.items()}
+        return {key: energy_loss_statistics(function, value, energies, bin_width) for key, value in data.items()}
     else:
         indices = np.digitize(data[:,2], energies)
-        return np.array([function(data[:,3][indices == i]) for i in range(energies.size)])
+        return np.array([0.0] + [function(data[:,3][indices == i]) for i in range(1, energies.size)])
 
 
 def average_energy_loss(
