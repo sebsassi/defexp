@@ -129,7 +129,7 @@ def main():
         out_dir = material_dir
     else:
         out_dir = f"{material_dir}/{args.extra_label}"
-        if not os.path.isdir(label_dir): os.mkdir(label_dir)
+        if not os.path.isdir(out_dir): os.mkdir(out_dir)
 
 
     for element in data.keys():
