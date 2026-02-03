@@ -64,7 +64,7 @@ def opt_f(params, eloss, histogram):
 
 
 def global_fit_func(eloss, energies, r0, p0a, p0b, p0c, p0d, p0e, p1a, p1b, p1c, p1d, p1e, e1a, e1b, s1a, s1b, p2a, p2b, p2c, p2d, p2e, e2a, e2b, s2a, s2b):
-    x = energies[np.newaxis,:]/energies[-1]
+    x = energies[:,np.newaxis]/energies[-1]
     u0 = np.exp(-(p0a + x*(p0b + x*(p0c + x*(p0d + x*p0e)))))
     u1 = np.exp(-(p1a + x*(p1b + x*(p1c + x*(p1d + x*p1e)))))
     u2 = np.exp(-(p2a + x*(p2b + x*(p2c + x*(p2d + x*p2e)))))
@@ -78,14 +78,14 @@ def global_fit_func(eloss, energies, r0, p0a, p0b, p0c, p0d, p0e, p1a, p1b, p1c,
     s2 = s2a + x*s2b
     norm1 = 1.0/(s1*np.sqrt(2.0*np.pi))
     norm2 = 1.0/(s2*np.sqrt(2.0*np.pi))
-    return (p0*r0*np.exp(-r0*eloss[:,np.newaxis])
-        + p1*norm1*np.exp(-(eloss[:,np.newaxis] - e1)**2/(2*s1**2))
-        + p2*norm2*np.exp(-(eloss[:,np.newaxis] - e2)**2/(2*s2**2)))
+    return (p0*r0*np.exp(-r0*eloss[np.newaxis,:])
+        + p1*norm1*np.exp(-(eloss[np.newaxis,:] - e1)**2/(2*s1**2))
+        + p2*norm2*np.exp(-(eloss[np.newaxis,:] - e2)**2/(2*s2**2)))
 
 
 def opt_global_f(params, eloss, energies, histogram):
     fit_value = global_fit_func(
-            eloss,
+            eloss, energies,
             params[0],
             params[1], params[2], params[3], params[4], params[5],
             params[6], params[7], params[8], params[9], params[10],
@@ -109,7 +109,7 @@ def main():
     else:
         filenames = glob.glob(f"{os.getenv("HOME")}/mdsim/processed/{args.material}/{args.extra_label}/eloss_histogram_*.npz")
 
-    for filename in filenames:
+    for filename in filenames[0:1]:
         data = np.load(filename)
         histogram = data["histogram"]
         energies = data["energies"]
@@ -126,8 +126,17 @@ def main():
             (0.01, emax), (-emax, emax)
         ]
 
-        res = opt.shgo(opt_global_f, args=(eloss, energies, histogram), bounds=bounds)
-        print(res.x)
+        res = opt.dual_annealing(
+                opt_global_f, bounds=bounds, args=(eloss[:-1], energies[:-1], histogram), maxiter=20000)
+        print(res.message)
+        print(f"E0 = {1.0/res.x[0]}")
+        print(f"p0 = exp(-({res.x[1]} + {res.x[2]}x + {res.x[3]}x^2 + {res.x[4]}x^3 + {res.x[5]}x^4))")
+        print(f"p1 = exp(-({res.x[6]} + {res.x[7]}x + {res.x[8]}x^2 + {res.x[9]}x^3 + {res.x[10]}x^4))")
+        print(f"E1 = {res.x[11]} + {res.x[12]}x")
+        print(f"dE1 = {res.x[13]} + {res.x[14]}x")
+        print(f"p2 = exp(-({res.x[15]} + {res.x[16]}x + {res.x[17]}x^2 + {res.x[18]}x^3 + {res.x[19]}x^4))")
+        print(f"E2 = {res.x[20]} + {res.x[21]}x")
+        print(f"dE2 = {res.x[22]} + {res.x[23]}x")
 
         # params = []
         # print(f"Processing {filename}")
@@ -136,10 +145,10 @@ def main():
         #     params.append(res.x)
 
         # params = np.array(params)
-        histogram_fit = global_fit_func(eloss, energies, *params)
+        histogram_fit = global_fit_func(eloss, energies, *res.x)
         # histogram_fit = np.array([[fit_func(eloss[i], *params[j]) for i in range(histogram.shape[1])] for j in range(histogram.shape[0])])
 
-        fig, ax = plt.subplots(3)
+        fig, ax = plt.subplots(2)
         ax[0].imshow(histogram.T, aspect="auto")
         ax[1].imshow(histogram_fit.T, aspect="auto")
 
