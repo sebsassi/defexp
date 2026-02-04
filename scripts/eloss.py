@@ -140,6 +140,7 @@ if __name__ == "__main__":
     parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
     parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
     parser.add_argument("-i", "--index-override", type=int, default=None, help="override the recoil atom index")
+    parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
@@ -153,6 +154,18 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbosity", type=int, default=2, help="verbosity of output")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
     args = parser.parse_args()
+    print(args)
+
+    if args.input_file is not None:
+        with open(args.input_file, "r") as f:
+            arguments = json.load(f)
+
+        for key, value in arguments.items():
+            if getattr(args, key) == parser.get_default(key):
+                setattr(args, key, value)
+
+    print(args)
+    exit()
 
     timestamp = int(time.time())
     if (args.raw_seed):
