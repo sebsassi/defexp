@@ -145,8 +145,10 @@ if __name__ == "__main__":
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
+    parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
+    parser.add_argument(      "--temperature", type=float, default=None, help="temperature of the system")
     parser.add_argument(      "--thermo", type=str, nargs="+", default=["Time","PotEng"], help="list of thermo quantities to save")
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
     parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
@@ -162,6 +164,9 @@ if __name__ == "__main__":
         for key, value in arguments.items():
             if getattr(args, key) == parser.get_default(key):
                 setattr(args, key, value)
+
+    if args.timestep is None:
+        raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
 
     timestamp = int(time.time())
     if (args.raw_seed):
@@ -208,20 +213,12 @@ if __name__ == "__main__":
     log_dir = f"{args.work_dir}/logs"
 
     material = defexp.load_material(f"{args.config_dir}/materials", f"{args.config_dir}/potentials", args.material)
-    sim_info = defexp.load_sim_info(f"{args.config_dir}/sim_info", args.material)
 
-    lattice = defexp.Lattice(material, sim_info["repeat"])
+    lattice = defexp.Lattice(material, args.repeat)
 
     if args.energy is not None:
         emin = args.energy
         emax = args.energy
-    else:
-        emin = args.emin if args.emin is not None else sim_info["emin"]
-        emax = args.emax if args.emax is not None else sim_info["emax"]
-
-    timestep = args.timestep if args.timestep is not None else sim_info["timestep"]
-    max_duration = args.max_duration if args.max_duration is not None else sim_info["impact_duration"]
-    max_displacement = args.max_displacement if args.max_displacement is not None else sim_info["max_displacement"]
 
     if args.extra_label is None:
         label = f"eloss_{material.label}"
@@ -234,7 +231,7 @@ if __name__ == "__main__":
     screen = None if args.screen else "none"
     simulation = defexp.RecoilSimulation(
             lattice, exp_io, lammps_io, dump=args.dump, time_lammps=True,
-            timestep=timestep, max_duration=max_duration, temperature=sim_info["temperature"],
+            timestep=timestep, max_duration=max_duration, temperature=args.temperature,
             screen=screen, verbosity=args.verbosity)
 
     ainds = lattice.indices_in_central_cell(lammps=False)

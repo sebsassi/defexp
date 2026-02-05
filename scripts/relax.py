@@ -50,13 +50,8 @@ if __name__ == "__main__":
     if not os.path.isdir(log_dir): os.mkdir(log_dir)
 
     material = defexp.load_material(f"{args.config_dir}/materials", f"{args.config_dir}/potentials", args.material)
-    sim_info = defexp.load_sim_info(f"{args.config_dir}/sim_info", args.material)
-    energies = np.loadtxt(f"{args.config_dir}/energies/{args.material}.dat")
 
-    lattice = defexp.Lattice(material, sim_info["repeat"])
-
-    timestep = args.timestep if args.timestep is not None else sim_info["timestep"]
-    duration = args.duration if args.duration is not None else sim_info["relax_duration"]
+    lattice = defexp.Lattice(material, args.repeat)
 
     label = f"relax_{material.label}"
     exp_io = defexp.ExperimentIO(label, res_dir, thermo_dir, log_dir)
@@ -64,6 +59,6 @@ if __name__ == "__main__":
 
     simulation = defexp.RelaxSimulation(
             lattice, lammps_io, time_lammps=True, timestep=timestep,
-            duration=duration, temperature=sim_info["temperature"])
+                duration=duration, temperature=args.temperature)
 
     simulation.run(verbosity=2)
