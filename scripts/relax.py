@@ -11,12 +11,30 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material name")
-    parser.add_argument("-d", "--res-dir", type=str, default=".", help="output directory for main results")
-    parser.add_argument("-c", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
-    parser.add_argument("--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
-    parser.add_argument("--duration", type=float, default=None, help="simulation duration in picoseconds")
-    parser.add_argument("--timestep", type=float, default=None, help="simulation timestep in picoseconds")
+    parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
+    parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
+    parser.add_argument(      "--relax-duration", type=float, default=2.0, help="simulation duration in picoseconds")
+    parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
+    parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
+    parser.add_argument(      "--temperature", type=float, default=None, help="temperature of the system")
+    parser.add_argument("-T", "--timestep", type=float, default=None, help="simulation timestep in picoseconds")
+    parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     args = parser.parse_args()
+
+    if args.input_file is not None:
+        with open(args.input_file, "r") as f:
+            arguments = json.load(f)
+
+        for key, value in arguments.items():
+            if getattr(args, key) == parser.get_default(key):
+                setattr(args, key, value)
+
+    if args.repeat is None:
+        raise RuntimeError("Argument `repeat` needs to be defined either in an input file or via the command line.")
+    if args.temperature is None:
+        raise RuntimeError("Argument `temperature` needs to be defined either in an input file or via the command line.")
+    if args.timestep is None:
+        raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
 
     lmp_dir = f"{args.work_dir}/lammps_work"
     dump_dir = f"{args.work_dir}/dump"

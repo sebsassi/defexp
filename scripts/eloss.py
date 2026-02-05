@@ -154,7 +154,6 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbosity", type=int, default=2, help="verbosity of output")
     parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
     args = parser.parse_args()
-    print(args)
 
     if args.input_file is not None:
         with open(args.input_file, "r") as f:
@@ -163,9 +162,6 @@ if __name__ == "__main__":
         for key, value in arguments.items():
             if getattr(args, key) == parser.get_default(key):
                 setattr(args, key, value)
-
-    print(args)
-    exit()
 
     timestamp = int(time.time())
     if (args.raw_seed):
