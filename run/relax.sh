@@ -6,6 +6,7 @@
 
 SIMULATION=$1
 MATERIAL=$2
+shift 2
 
 MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
 if [ ! -d "$MD_WORKDIR" ]; then
@@ -59,7 +60,7 @@ if [ $? -ne 0 ]; then
 fi
 
 srun python "$PROJ/mdsim/defexp/scripts/relax.py" "$MATERIAL" \
-    --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR" --res-dir "$MD_WORKDIR"
+    --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR" --res-dir "$MD_WORKDIR" $@
 
 deactivate
 
