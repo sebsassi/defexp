@@ -26,8 +26,9 @@ if __name__ == "__main__":
             arguments = json.load(f)
 
         for key, value in arguments.items():
-            if getattr(args, key) == parser.get_default(key):
-                setattr(args, key, value)
+            if key in vars(args).keys():
+                if getattr(args, key) == parser.get_default(key):
+                    setattr(args, key, value)
 
     if args.repeat is None:
         raise RuntimeError("Argument `repeat` needs to be defined either in an input file or via the command line.")
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
 
     simulation = defexp.RelaxSimulation(
-            lattice, lammps_io, time_lammps=True, timestep=timestep,
-                duration=duration, temperature=args.temperature)
+            lattice, lammps_io, time_lammps=True, timestep=args.timestep,
+                duration=args.relax_duration, temperature=args.temperature)
 
     simulation.run(verbosity=2)

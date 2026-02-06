@@ -162,8 +162,9 @@ if __name__ == "__main__":
             arguments = json.load(f)
 
         for key, value in arguments.items():
-            if getattr(args, key) == parser.get_default(key):
-                setattr(args, key, value)
+            if key in vars(args).keys():
+                if getattr(args, key) == parser.get_default(key):
+                    setattr(args, key, value)
 
     if args.timestep is None:
         raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
@@ -231,7 +232,7 @@ if __name__ == "__main__":
     screen = None if args.screen else "none"
     simulation = defexp.RecoilSimulation(
             lattice, exp_io, lammps_io, dump=args.dump, time_lammps=True,
-            timestep=timestep, max_duration=max_duration, temperature=args.temperature,
+            timestep=args.timestep, max_duration=args.max_duration, temperature=args.temperature,
             screen=screen, verbosity=args.verbosity)
 
     ainds = lattice.indices_in_central_cell(lammps=False)
@@ -247,4 +248,4 @@ if __name__ == "__main__":
             direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
             test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
-            max_displacement=max_displacement, uid=args.jid)
+            max_displacement=args.max_displacement, uid=args.jid)
