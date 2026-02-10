@@ -1009,8 +1009,7 @@ class RecoilSimulation:
 
     def run(
         self, atom_type: int, aind: int, unitv: np.ndarray, energy: float,
-        df_name: str, tf_name: str, pid: int, log_res: bool = False,
-        test_frenkel: bool = True, zero_nonfrenkel: bool = True,
+        pid: int, log_res: bool = False, zero_nonfrenkel: bool = True,
         seed: int = 1254623, verbosity: int = 1, adaptive_timestep: bool = True,
         max_displacement: float = 0.0005, uid: typing.Optional[int] = None
     ) -> tuple[float, bool]:

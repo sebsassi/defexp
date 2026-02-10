@@ -37,13 +37,7 @@ def random_directions(rng, central_dir: tuple[float], max_dev: float, count: int
     return pa, az, dir
 
 
-def random_energy_loss(
-    recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, aind: int, pid: int,
-    direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
-    verbosity: int = 1, **kwargs
-):
-    rng = np.random.default_rng(seed)
+def generate_directions(rng, direction, max_angle, count):
 
     if direction[0] == 0.0 and direction[1] == 0.0 and max_angle == np.pi:
         pa, az = defexp.uniform_angles(rng, count)
@@ -53,66 +47,104 @@ def random_energy_loss(
         az = direction[1]*np.ones(count)
         unitv = defexp.angles_to_vec(pa, az)
     else:
-        pa, az, unitv = random_directions(rng, central_dir, max_angle, count)
+        pa, az, unitv = random_directions(rng, direction, max_angle, count)
+
+    return pa, az, unitv
 
 
+def generate_energies(rng, emin, emax, count):
     if emin >= emax:
-        energies = emin*np.ones(count)
+        return emin*np.ones(count)
     else:
-        energies = emin + (emax - emin)*rng.random(count)
+        return emin + (emax - emin)*rng.random(count)
 
-    atom_type = recoil_simulation.lattice.atoms.numbers[aind]
 
-    if "symbol" in recoil_simulation.lattice.material.atom_props[atom_type]:
-        aid = recoil_simulation.lattice.material.atom_props[atom_type]["symbol"]
-    else:
-        aid = str(atom_type)
+def generate_atom_indices(rng, ainds, count):
+    return rng.choice(ainds, count)
 
-    result_fname = recoil_simulation.io.output_file_name(aid, aind, pid)
-    defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
 
-    df_name, tf_name = recoil_simulation.lammps_io.create_data_and_thermo_file(pid)
+def random_energy_loss(
+    recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
+    emin: float, emax: float, pid: int, pid_to_index: typing.Optional[int] = None,
+    direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
+    verbosity: int = 1, **kwargs
+):
+    rng = np.random.default_rng(seed)
+    pa, az, unitv = generate_directions(rng, direction, max_angle, count)
+    energies = generate_energies(rng, emin, emax, count)
 
-    for i in range(count):
-        if verbosity > 1:
-            defexp.log_print(
-                    f"Working on sample {i + 1:d}/{count:d}: "
-                    f"{pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
-        elif verbosity == 1:
-            defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
+    ainds = recoil_simulation.lattice.indices_in_central_cell(lammps=False)
+    if pid_to_index:
+        ainds = lattice.indices_in_central_cell(lammps=False)
+        atom_index = ainds[pid % recoil_simulation.lattice.material.unit_cell_atoms.shape[0]]
+        atom_type = recoil_simulation.lattice.atoms.numbers[atom_index]
 
-        depot, frenkel_defect = recoil_simulation.run(
-                atom_type, aind, unitv[i], energies[i], df_name, tf_name, pid,
-                verbosity=verbosity, **kwargs)
+        symbol = recoil_simulation.lattice.material.atom_props[atom_type]["symbol"]
 
-        with open(result_fname, "a") as f:
+        result_fname = recoil_simulation.io.output_file_name(symbol, atom_index, pid)
+        defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
+
+        for i in range(count):
+            if verbosity > 1:
+                defexp.log_print(
+                        f"Working on sample {i + 1:d}/{count:d}: "
+                        f"{pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
+            elif verbosity == 1:
+                defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
+
+            depot, frenkel_defect = recoil_simulation.run(
+                    atom_type, atom_index, unitv[i], energies[i], pid,
+                    verbosity=verbosity, **kwargs)
+
+            with open(result_fname, "a") as f:
+                if verbosity > 2:
+                    logging.debug(f"Opened file {result_fname} in append mode.")
+                f.write(
+                        f"{pa[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
+                        f"{depot:.16e} {int(frenkel_defect)}\n")
+
             if verbosity > 2:
-                logging.debug(f"Opened file {result_fname} in append mode.")
-            f.write(
-                    f"{pa[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
-                    f"{depot:.16e} {int(frenkel_defect)}\n")
+                logging.debug(f"Wrote to file {result_fname}.")
+    else:
+        result_fnames = {
+            atom_type: recoil_simulation.io.output_file_name(prop["symbol"], "random_atom", pid)
+            for atom_type, prop in recoil_simulation.lattice.material.atom_props.items()
+        }
+        defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
+        atom_indices = generate_atom_indices(ainds, count)
 
-        if verbosity > 2:
-            logging.debug(f"Wrote to file {result_fname}.")
+        for i in range(count):
+            if verbosity > 1:
+                defexp.log_print(
+                        f"Working on sample {i + 1:d}/{count:d}: "
+                        f"{atom_indices[i]} {pa[i]:.5f} {az[i]:.5f} {energies[i]:.5e}.")
+            elif verbosity == 1:
+                defexp.log_print(f"Working on sample {i + 1:d}/{count:d}.")
+
+            atom_type = recoil_simulation.lattice.atoms.numbers[atom_indices[i]]
+            depot, frenkel_defect = recoil_simulation.run(
+                    atom_type, atom_indices[i], unitv[i], energies[i], pid,
+                    verbosity=verbosity, **kwargs)
+
+            result_fname = result_fnames[atom_type]
+            with open(result_fname, "a") as f:
+                if verbosity > 2:
+                    logging.debug(f"Opened file {result_fname} in append mode.")
+                f.write(
+                        f"{atom_indices[i]} {pa[i]:.16e} {az[i]:.16e} {energies[i]:.16e} "
+                        f"{depot:.16e} {int(frenkel_defect)}\n")
+
+            if verbosity > 2:
+                logging.debug(f"Wrote to file {result_fname}.")
+
 
 
 def execute(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, aind: int, pid: int, parallel: bool = False,
-    unique_seeds: bool = True, **kwargs
+    emin: float, emax: float, pid: int, **kwargs
 ):
-    if parallel:
-        processes = []
-        ainds = simulation.lattice.indices_in_central_cell(lammps=False)
-        for i, aind, atom_type in enumerate(zip(ainds, atom_types)):
-            process_seed = abs(hash((seed, i))) if unique_seeds else seed
-            args = (recoil_simulation, process_seed, count, emin, emax, aind, i)
-            processes.append(mp.Process(target=random_energy_loss, args=args, kwargs=kwargs))
-        for p in processes: p.start()
-        for p in processes: p.join()
-    else:
-        random_energy_loss(
-                recoil_simulation, seed, count, emin, emax, aind, pid, **kwargs)
+    random_energy_loss(
+            recoil_simulation, seed, count, emin, emax, pid, **kwargs)
 
 
 def angle_pair(arg: str):
@@ -128,7 +160,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("material", type=str, help="material name")
     parser.add_argument("jid", type=int, help="job ID")
-    parser.add_argument("i", type=int, help="index of recoil atom")
+    parser.add_argument("pid", type=int, help="process ID")
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
@@ -139,11 +171,11 @@ if __name__ == "__main__":
     parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
     parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
-    parser.add_argument("-i", "--index-override", type=int, default=None, help="override the recoil atom index")
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
+    parser.add_argument("-p", "--pid-to-index", type=int, default=None, help="use process ID to index into unit cell; otherwise sample randomly")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
@@ -188,7 +220,7 @@ if __name__ == "__main__":
     logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
     logging.info(f"Material: {args.material}")
     logging.info(f"Job ID: {args.jid}")
-    logging.info(f"Index: {args.i}")
+    logging.info(f"Process ID: {args.pid}")
     logging.info(f"Input seed: {args.seed}")
     logging.info(f"True seed: {seed}")
     logging.info(f"Count: {args.count}")
@@ -202,6 +234,7 @@ if __name__ == "__main__":
     logging.info(f"Minimum energy: {args.emin}")
     logging.info(f"Maximum energy: {args.emax}")
     logging.info(f"Maximum duration: {args.max_duration}")
+    logging.info(f"Index: {args.index}")
     logging.info(f"Timestep: {args.timestep}")
     logging.info(f"Constant timestep {args.constant_timestep}")
     logging.info(f"Dump: {args.dump}")
@@ -235,17 +268,10 @@ if __name__ == "__main__":
             timestep=args.timestep, max_duration=args.max_duration, temperature=args.temperature,
             screen=screen, verbosity=args.verbosity)
 
-    ainds = lattice.indices_in_central_cell(lammps=False)
-    if args.index_override is None:
-        atom_index = ainds[args.i % material.unit_cell_atoms.shape[0]]
-    else:
-        atom_index = ainds[args.index_override % material.unit_cell_atoms.shape[0]]
-    logging.info(f"Atom index: {atom_index}")
-
-
-    execute(
-            simulation, seed, args.count, emin, emax, atom_index, args.i,
-            direction=args.direction, max_angle=args.max_angle, unique_seeds=True,
-            test_frenkel=True, zero_nonfrenkel=args.zero_nonfrenkel,
-            verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
+    random_energy_loss(
+            simulation, seed, args.count, emin, emax, args.pid,
+            pid_to_index=args.pid_to_index, direction=args.direction,
+            max_angle=args.max_angle, unique_seeds=True, test_frenkel=True,
+            zero_nonfrenkel=args.zero_nonfrenkel, verbosity=args.verbosity,
+            adaptive_timestep=not args.constant_timestep,
             max_displacement=args.max_displacement, uid=args.jid)
