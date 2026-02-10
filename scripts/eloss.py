@@ -65,7 +65,7 @@ def generate_atom_indices(rng, ainds, count):
 
 def random_energy_loss(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, pid: int, pid_to_index: typing.Optional[int] = None,
+    emin: float, emax: float, pid: int, pid_to_index: bool = False,
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
     verbosity: int = 1, **kwargs
 ):
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
-    parser.add_argument("-p", "--pid-to-index", type=int, default=None, help="use process ID to index into unit cell; otherwise sample randomly")
+    parser.add_argument("-p", "--pid-to-index", action="store_true", help="use process ID to index into unit cell; otherwise sample randomly")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
