@@ -110,8 +110,9 @@ def random_energy_loss(
             atom_type: recoil_simulation.io.output_file_name(prop["symbol"], "random_atom", pid)
             for atom_type, prop in recoil_simulation.lattice.material.atom_props.items()
         }
-        defexp.ensure_file_ends_with_new_line(result_fname, verbosity)
-        atom_indices = generate_atom_indices(ainds, count)
+        for fname in result_fnames.values():
+            defexp.ensure_file_ends_with_new_line(fname, verbosity)
+        atom_indices = generate_atom_indices(rng, ainds, count)
 
         for i in range(count):
             if verbosity > 1:
