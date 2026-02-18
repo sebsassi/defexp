@@ -270,7 +270,6 @@ if __name__ == "__main__":
     random_energy_loss(
             simulation, seed, args.count, emin, emax, args.pid,
             pid_to_index=args.pid_to_index, direction=args.direction,
-            max_angle=args.max_angle, unique_seeds=True, test_frenkel=True,
-            zero_nonfrenkel=args.zero_nonfrenkel, verbosity=args.verbosity,
-            adaptive_timestep=not args.constant_timestep,
+            max_angle=args.max_angle, zero_nonfrenkel=args.zero_nonfrenkel,
+            verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
             max_displacement=args.max_displacement, uid=args.jid)
