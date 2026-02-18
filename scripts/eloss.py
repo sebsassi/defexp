@@ -234,7 +234,6 @@ if __name__ == "__main__":
     logging.info(f"Minimum energy: {args.emin}")
     logging.info(f"Maximum energy: {args.emax}")
     logging.info(f"Maximum duration: {args.max_duration}")
-    logging.info(f"Index: {args.index}")
     logging.info(f"Timestep: {args.timestep}")
     logging.info(f"Constant timestep {args.constant_timestep}")
     logging.info(f"Dump: {args.dump}")
