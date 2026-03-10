@@ -63,10 +63,16 @@ def generate_atom_indices(rng, ainds, count):
     return rng.choice(ainds, count)
 
 
+def symbol_for(lattice: defexp.Lattice, atom_index: int):
+    atom_type = lattice.atoms.numbers[atom_index]
+    return lattice.material.atom_props[atom_type]["symbol"]
+
+
 def random_energy_loss(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, pid: int, pid_to_index: bool = False,
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
+    atom_symbols: typing.Optional[List[str]] = None,
     verbosity: int = 1, **kwargs
 ):
     rng = np.random.default_rng(seed)
@@ -74,8 +80,11 @@ def random_energy_loss(
     energies = generate_energies(rng, emin, emax, count)
 
     ainds = recoil_simulation.lattice.indices_in_central_cell(lammps=False)
+
+    if atom_symbols is not None:
+        ainds = np.array([ind for ind in ainds if symbol_for(recoil_simulation.lattice, ind) in atom_symbols], dtype=np.int64)
+
     if pid_to_index:
-        ainds = lattice.indices_in_central_cell(lammps=False)
         atom_index = ainds[pid % recoil_simulation.lattice.material.unit_cell_atoms.shape[0]]
         atom_type = recoil_simulation.lattice.atoms.numbers[atom_index]
 
@@ -164,6 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("pid", type=int, help="process ID")
     parser.add_argument("seed", type=int, help="input rng seed")
     parser.add_argument("count", type=int, help="number of recoil experiments")
+    parser.add_argument(      "--atom-symbols", type=str, nargs='+', default=None, help="list of chemical symbols of atoms for which simulations should be performed")
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
     parser.add_argument("-D", "--direction", type=float, nargs=2, default=[0.0, 0.0], help="recoil directon as an angle pair ALT AZ in radians")
@@ -218,27 +228,9 @@ if __name__ == "__main__":
         logging.basicConfig(
                 filename=f"eloss_{args.material}_{args.extra_label}_{args.jid:d}_{args.pid:d}_{args.seed:d}_{args.count:d}.log",
                 level=logging.DEBUG)
+    logging.info(f"args: {json.dumps(vars(args), indent=4)}")
     logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
-    logging.info(f"Material: {args.material}")
-    logging.info(f"Job ID: {args.jid}")
-    logging.info(f"Process ID: {args.pid}")
-    logging.info(f"Input seed: {args.seed}")
     logging.info(f"True seed: {seed}")
-    logging.info(f"Count: {args.count}")
-    logging.info(f"Config path: {args.config_dir}")
-    logging.info(f"Result directory: {args.res_dir}")
-    logging.info(f"Work directory: {args.work_dir}")
-    logging.info(f"Zero non-Frenkel: {args.zero_nonfrenkel}")
-    logging.info(f"Direction: {args.direction}")
-    logging.info(f"Maximum angle: {args.max_angle}")
-    logging.info(f"Energy: {args.energy}")
-    logging.info(f"Minimum energy: {args.emin}")
-    logging.info(f"Maximum energy: {args.emax}")
-    logging.info(f"Maximum duration: {args.max_duration}")
-    logging.info(f"Timestep: {args.timestep}")
-    logging.info(f"Constant timestep {args.constant_timestep}")
-    logging.info(f"Dump: {args.dump}")
-    logging.info(f"Timeless seed: {args.timeless_seed}")
 
     res_dir = f"{args.res_dir}/eloss/{args.material}"
     lmp_dir = f"{args.work_dir}/lammps_work"
@@ -273,4 +265,4 @@ if __name__ == "__main__":
             pid_to_index=args.pid_to_index, direction=args.direction,
             max_angle=args.max_angle, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
-            max_displacement=args.max_displacement, uid=args.jid)
+            max_displacement=args.max_displacement, uid=args.jid, atom_symbols=args.atom_symbols)
