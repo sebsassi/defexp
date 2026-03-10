@@ -72,7 +72,7 @@ def random_energy_loss(
     recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
     emin: float, emax: float, pid: int, pid_to_index: bool = False,
     direction: tuple[float] = (0.0, 0.0), max_angle: float = np.pi,
-    atom_symbols: typing.Optional[List[str]] = None,
+    atom_symbols: typing.Optional[list[str]] = None,
     verbosity: int = 1, **kwargs
 ):
     rng = np.random.default_rng(seed)
