@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "defexp"
 version = "0.0.0"
 description = "Just some scripts for running LAMMPS simulations"
-requires-python = ">= 3.13"
+requires-python = ">= 3.12"
 dependencies = [
     "numpy",
     "ase"
