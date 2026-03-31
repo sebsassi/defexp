@@ -8,59 +8,63 @@ SIMULATION=$1
 MATERIAL=$2
 shift 2
 
-MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
-if [ ! -d "$MD_WORKDIR" ]; then
-    mkdir  $MD_WORKDIR
+if [[ -z "$WORK" ]]; then
+    echo "Environment variable WORK is not defined."
+    exit 1
+fi
+if [[ ! -d "$WORK" ]]; then
+    echo "$WORK is not a directory."
+    exit 1
+fi
+
+if [[ -z $PROJ ]]; then
+    echo "Environment variable PROJ is not defined."
+    exit 1
+fi
+if [[ ! -d "$PROJ" ]]; then
+    echo "$PROJ is not a directory."
+    exit 1
+fi
+
+MD_WORK=$WORK/mdsim
+MD_PROJ=$PROJ/mdsim
+
+if [ ! -d "$MD_WORK" ]; then
+    mkdir  $MD_WORK
     if [ $? -ne 0 ]; then
-        echo "Could not create directory $MD_WORKDIR."
+        echo "Could not create directory $MD_WORK."
         exit 1
     fi
 fi
 
-cd $MD_WORKDIR
+cd $MD_WORK
 
 if [ $? -ne 0 ]; then
-    echo "Could not change directory to $MD_WORKDIR."
+    echo "Could not change directory to $MD_WORK."
     exit 1
 fi
 
-module purge
-if [ $? -eq 0 ]; then
-    echo "Modules unloaded successfully."
+bash $MD_PROJ/load_dependencies.sh
+if [[ $? -eq 0 ]]; then
+    echo "Dependencies loaded successfully."
 else
-    echo "Failed to unload modules."
+    echo "Failed to load dependencies."
     exit 1
 fi
 
-module load FFTW
-if [ $? -eq 0 ]; then
-    echo "Module FFTW loaded successfully."
-else
-    echo "Failed to load FFTW."
-    exit 1
-fi
-
-module load Python
-if [ $? -eq 0 ]; then
-    echo "Module Python loaded successfully."
-else
-    echo "Failed to load Python."
-    exit 1
-fi
-
-if [ ! -d "$PROJ/mdsim/venv" ]; then
+if [ ! -d "$MD_PROJ/venv" ]; then
     echo "Virtual environment does not exist."
     exit 1
 fi
 
-source "$PROJ/mdsim/venv/bin/activate"
+source "$MD_PROJ/venv/bin/activate"
 if [ $? -ne 0 ]; then
     echo "Failed to source virtual environment."
     exit 1
 fi
 
-srun python "$PROJ/mdsim/defexp/scripts/relax.py" "$MATERIAL" \
-    --config-dir "$PROJ/mdsim/defexp/samples" --work-dir "$MD_WORKDIR" --res-dir "$MD_WORKDIR" $@
+srun python "$MD_PROJ/defexp/scripts/relax.py" "$MATERIAL" \
+    --config-dir "$MD_PROJ/defexp/samples" --work-dir "$MD_WORK" --res-dir "$MD_WORK" $@
 
 deactivate
 

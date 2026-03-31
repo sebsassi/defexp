@@ -12,64 +12,64 @@ COUNT=$2
 SEED=1337
 shift 2
 
-srun lscpu
+if [[ -z "$WORK" ]]; then
+    echo "Environment variable WORK is not defined."
+    exit 1
+fi
+if [[ ! -d "$WORK" ]]; then
+    echo "$WORK is not a directory."
+    exit 1
+fi
 
-MD_WORKDIR=/wrk-kappa/users/$USER/mdsim
+if [[ -z $PROJ ]]; then
+    echo "Environment variable PROJ is not defined."
+    exit 1
+fi
+if [[ ! -d "$PROJ" ]]; then
+    echo "$PROJ is not a directory."
+    exit 1
+fi
+
+MD_WORK=$WORK/mdsim
 MD_PROJ=$PROJ/mdsim
 
-if [ ! -d "$MD_WORKDIR/lammps_work" ]; then
-    echo "Directory $MD_WORKDIR/lammps_work does not exist."
+if [ ! -d "$MD_WORK/lammps_work" ]; then
+    echo "Directory $MD_WORK/lammps_work does not exist."
     exit 1
 fi
 
-if [ ! -d "$MD_WORKDIR/dump" ]; then
-    echo "Directory $MD_WORKDIR/dump does not exist."
+if [ ! -d "$MD_WORK/dump" ]; then
+    echo "Directory $MD_WORK/dump does not exist."
     exit 1
 fi
 
-if [ ! -d "$MD_WORKDIR/thermo" ]; then
-    echo "Directory $MD_WORKDIR/thermo does not exist."
+if [ ! -d "$MD_WORK/thermo" ]; then
+    echo "Directory $MD_WORK/thermo does not exist."
     exit 1
 fi
 
-if [ ! -d "$MD_WORKDIR/logs" ]; then
-    echo "Directory $MD_WORKDIR/logs does not exist."
+if [ ! -d "$MD_WORK/logs" ]; then
+    echo "Directory $MD_WORK/logs does not exist."
     exit 1
 fi
 
-if [ ! -d "$MD_WORKDIR/eloss/$MATERIAL" ]; then
-    echo "Directory $MD_WORKDIR/eloss/$MATERIAL does not exist."
+if [ ! -d "$MD_WORK/eloss/$MATERIAL" ]; then
+    echo "Directory $MD_WORK/eloss/$MATERIAL does not exist."
     exit 1
 fi
 
-cd $MD_WORKDIR
+cd $MD_WORK
 
 if [ $? -ne 0 ]; then
     echo "Couldn't change directory to" $MY_WORKDIR
     exit 1
 fi
 
-module purge
-if [ $? -eq 0 ]; then
-    echo "Modules unloaded successfully."
+bash $MD_PROJ/load_dependencies.sh
+if [[ $? -eq 0 ]]; then
+    echo "Dependencies loaded successfully."
 else
-    echo "Failed to unload modules."
-    exit 1
-fi
-
-module load FFTW
-if [ $? -eq 0 ]; then
-    echo "Module FFTW loaded successfully."
-else
-    echo "Failed to load FFTW."
-    exit 1
-fi
-
-module load Python
-if [ $? -eq 0 ]; then
-    echo "Module Python loaded successfully."
-else
-    echo "Failed to load Python."
+    echo "Failed to load dependencies."
     exit 1
 fi
 
@@ -85,7 +85,7 @@ if [ $? -ne 0 ]; then
 fi
 
 srun python "$MD_PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$SEED" "$COUNT" \
-    --config-dir "$MD_PROJ/defexp/samples" --res-dir "$MD_WORKDIR" --work-dir "$MD_WORKDIR" $@
+    --config-dir "$MD_PROJ/defexp/samples" --res-dir "$MD_WORK" --work-dir "$MD_WORK" $@
 
 deactivate
 
