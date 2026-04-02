@@ -1,8 +1,9 @@
 #!/bin/bash
+#SBATCH --job-name=relax
 #SBATCH -t 10:00
+#SBATCH -c 1
+#SBATCH -n 1
 #SBATCH --mem-per-cpu=600
-#SBATCH --error="/home/%u/err/relax-%j.err"
-#SBATCH --output="/home/%u/out/relax-%j.out"
 
 SIMULATION=$1
 MATERIAL=$2

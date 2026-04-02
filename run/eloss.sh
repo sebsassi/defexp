@@ -3,8 +3,6 @@
 #SBATCH -c 1
 #SBATCH -n 1
 #SBATCH --mem-per-cpu=600
-#SBATCH --error="/wrk-kappa/users/%u/err/eloss-%j.err"
-#SBATCH --output="/wrk-kappa/users/%u/out/eloss-%j.out"
 #SBATCH --hint=nomultithread
 
 MATERIAL=$1
