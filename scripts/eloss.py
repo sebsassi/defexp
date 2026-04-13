@@ -30,7 +30,7 @@ def random_directions(rng, central_dir: tuple[float], max_dev: float, count: int
     cosrot = np.cos(rot)
     sinrot = np.sin(rot)
 
-    dir = z*cosdev + y*sindev*sinrot + x*sindev*cosrot
+    dir = z*cosdev[:,np.newaxis] + y*(sindev*sinrot)[:,np.newaxis] + x*(sindev*cosrot)[:,np.newaxis]
     pa = np.arccos(dir[2])
     az = np.atan2(dir[1], dir[0])
 
