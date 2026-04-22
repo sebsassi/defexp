@@ -5,6 +5,17 @@
 #SBATCH --mem-per-cpu=600
 #SBATCH --hint=nomultithread
 
+function load_module()
+{
+    module load $1
+    if [[ $? -eq 0 ]]; then
+        echo "Module $1 loaded successfully."
+    else
+        echo "Failed to load module $1."
+        exit 1
+    fi
+}
+
 MATERIAL=$1
 COUNT=$2
 SEED=1337
@@ -59,17 +70,21 @@ fi
 cd $MD_WORK
 
 if [ $? -ne 0 ]; then
-    echo "Couldn't change directory to" $MY_WORKDIR
+    echo "Could not change directory to $MD_WORK."
     exit 1
 fi
 
-bash $MD_PROJ/load_dependencies.sh
+module purge
 if [[ $? -eq 0 ]]; then
-    echo "Dependencies loaded successfully."
+    echo "Modules unloaded successfully."
 else
-    echo "Failed to load dependencies."
+    echo "Failed to unload modules."
     exit 1
 fi
+
+for mod in $(cat $MD_PROJ/module_deps.txt); do
+    load_module $mod
+done
 
 if [ ! -d "$MD_PROJ/venv" ]; then
     echo "Virtual environment does not exist."
