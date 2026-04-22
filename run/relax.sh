@@ -5,13 +5,13 @@
 #SBATCH -n 1
 #SBATCH --mem-per-cpu=600
 
-function load_module()
+function load_modules()
 {
-    module load $1
+    module load $@
     if [[ $? -eq 0 ]]; then
-        echo "Module $1 loaded successfully."
+        echo "Modules $@ loaded successfully."
     else
-        echo "Failed to load module $1."
+        echo "Failed to load modules $@."
         exit 1
     fi
 }
@@ -64,9 +64,7 @@ else
     exit 1
 fi
 
-for mod in $(cat $MD_PROJ/module_deps.txt); do
-    load_module $mod
-done
+load_modules $(cat $MD_PROJ/module_deps.txt)
 
 if [ ! -d "$MD_PROJ/venv" ]; then
     echo "Virtual environment does not exist."
