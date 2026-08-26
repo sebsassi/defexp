@@ -152,13 +152,6 @@ def random_energy_loss(
                 logging.debug(f"Wrote to file {result_fname}.")
 
 
-def angle_pair(arg: str):
-    pair = arg.split(",")
-    return float(pair[0]), float(pair[1])
-
-def str_list(arg: str):
-    return arg.split(",")
-
 def execute(args, thread_id):
     args.pid = args.num_threads*args.pid + thread_id
 
