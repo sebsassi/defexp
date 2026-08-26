@@ -268,4 +268,4 @@ if __name__ == "__main__":
         raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
 
     with mp.Pool(args.num_threads) as p:
-        p.map(lambda id: execute(args, id), [i for i in range(args.num_threads)])
+        p.starmap(execute, [(args, i) for i in range(args.num_threads)])
