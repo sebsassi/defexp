@@ -6,12 +6,16 @@ import os
 import logging
 import typing
 
+import multiprocessing as mp
+
 import numpy as np
 
 import defexp
 
 
-def random_directions(rng, central_dir: tuple[float], max_dev: float, count: int):
+def random_directions(
+    rng, central_dir: tuple[float], max_dev: float, count: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     sinpa = np.sin(central_dir[0])
     cospa = np.cos(central_dir[0])
     sinaz = np.sin(central_dir[1])
@@ -148,15 +152,6 @@ def random_energy_loss(
                 logging.debug(f"Wrote to file {result_fname}.")
 
 
-
-def execute(
-    recoil_simulation: defexp.RecoilSimulation, seed: int, count: int,
-    emin: float, emax: float, pid: int, **kwargs
-):
-    random_energy_loss(
-            recoil_simulation, seed, count, emin, emax, pid, **kwargs)
-
-
 def angle_pair(arg: str):
     pair = arg.split(",")
     return float(pair[0]), float(pair[1])
@@ -164,53 +159,8 @@ def angle_pair(arg: str):
 def str_list(arg: str):
     return arg.split(",")
 
-if __name__ == "__main__":
-    print("Running eloss.py")
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("material", type=str, help="material name")
-    parser.add_argument("jid", type=int, help="job ID")
-    parser.add_argument("pid", type=int, help="process ID")
-    parser.add_argument("seed", type=int, help="input rng seed")
-    parser.add_argument("count", type=int, help="number of recoil experiments")
-    parser.add_argument(      "--atom-symbols", type=str, nargs='+', default=None, help="list of chemical symbols of atoms for which simulations should be performed")
-    parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
-    parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
-    parser.add_argument("-D", "--direction", type=float, nargs=2, default=[0.0, 0.0], help="recoil directon as an angle pair ALT AZ in radians")
-    parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
-    parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
-    parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
-    parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
-    parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
-    parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
-    parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
-    parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
-    parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
-    parser.add_argument("-p", "--pid-to-index", action="store_true", help="use process ID to index into unit cell; otherwise sample randomly")
-    parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
-    parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
-    parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
-    parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
-    parser.add_argument(      "--temperature", type=float, default=None, help="temperature of the system")
-    parser.add_argument(      "--thermo", type=str, nargs="+", default=["Time","PotEng"], help="list of thermo quantities to save")
-    parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
-    parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
-    parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
-    parser.add_argument("-v", "--verbosity", type=int, default=2, help="verbosity of output")
-    parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
-    args = parser.parse_args()
-
-    if args.input_file is not None:
-        with open(args.input_file, "r") as f:
-            arguments = json.load(f)
-
-        for key, value in arguments.items():
-            if key in vars(args).keys():
-                if getattr(args, key) == parser.get_default(key):
-                    setattr(args, key, value)
-
-    if args.timestep is None:
-        raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
+def execute(args, thread_id):
+    args.pid = args.num_threads*args.pid + thread_id
 
     timestamp = int(time.time())
     if (args.raw_seed):
@@ -266,3 +216,56 @@ if __name__ == "__main__":
             max_angle=args.max_angle, zero_nonfrenkel=args.zero_nonfrenkel,
             verbosity=args.verbosity, adaptive_timestep=not args.constant_timestep,
             max_displacement=args.max_displacement, uid=args.jid, atom_symbols=args.atom_symbols)
+
+
+if __name__ == "__main__":
+    print("Running eloss.py")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("material", type=str, help="material name")
+    parser.add_argument("jid", type=int, help="job ID")
+    parser.add_argument("pid", type=int, help="process ID")
+    parser.add_argument("seed", type=int, help="input rng seed")
+    parser.add_argument("count", type=int, help="number of recoil experiments")
+    parser.add_argument(      "--atom-symbols", type=str, nargs='+', default=None, help="list of chemical symbols of atoms for which simulations should be performed")
+    parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
+    parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument("-D", "--direction", type=float, nargs=2, default=[0.0, 0.0], help="recoil directon as an angle pair ALT AZ in radians")
+    parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
+    parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
+    parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
+    parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
+    parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
+    parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
+    parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
+    parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
+    parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
+    parser.add_argument("-n", "--num-threads", type=int, default=1, help="number of threads running separate simulations")
+    parser.add_argument("-p", "--pid-to-index", action="store_true", help="use process ID to index into unit cell; otherwise sample randomly")
+    parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
+    parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
+    parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
+    parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
+    parser.add_argument(      "--temperature", type=float, default=None, help="temperature of the system")
+    parser.add_argument(      "--thermo", type=str, nargs="+", default=["Time","PotEng"], help="list of thermo quantities to save")
+    parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
+    parser.add_argument("-T", "--timestep", type=float, default=None, help="minimum simulation timestep in picoseconds")
+    parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
+    parser.add_argument("-v", "--verbosity", type=int, default=2, help="verbosity of output")
+    parser.add_argument("-z", "--zero-nonfrenkel", action="store_true", help="set energy loss to zero if there are no Frenkel defects")
+    args = parser.parse_args()
+
+    if args.input_file is not None:
+        with open(args.input_file, "r") as f:
+            arguments = json.load(f)
+
+        for key, value in arguments.items():
+            if key in vars(args).keys():
+                if getattr(args, key) == parser.get_default(key):
+                    setattr(args, key, value)
+
+    if args.timestep is None:
+        raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
+
+    with mp.Pool(args.num_threads) as p:
+        p.map(lambda id: execute(args, id), [i for i in range(args.num_threads)])
