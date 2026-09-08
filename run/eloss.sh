@@ -34,31 +34,16 @@ if [[ ! -d "$PROJ" ]]; then
     exit 1
 fi
 
-MD_WORK=$WORK/mdsim
 MD_PROJ=$PROJ/mdsim
+MD_WORK=$WORK/mdsim
 
-if [ ! -d "$MD_WORK/lammps_work" ]; then
-    echo "Directory $MD_WORK/lammps_work does not exist."
+if [ ! -d "$MD_PROJ" ]; then
+    echo "Directory $MD_PROJ does not exist."
     exit 1
 fi
 
-if [ ! -d "$MD_WORK/dump" ]; then
-    echo "Directory $MD_WORK/dump does not exist."
-    exit 1
-fi
-
-if [ ! -d "$MD_WORK/thermo" ]; then
-    echo "Directory $MD_WORK/thermo does not exist."
-    exit 1
-fi
-
-if [ ! -d "$MD_WORK/logs" ]; then
-    echo "Directory $MD_WORK/logs does not exist."
-    exit 1
-fi
-
-if [ ! -d "$MD_WORK/eloss/$MATERIAL" ]; then
-    echo "Directory $MD_WORK/eloss/$MATERIAL does not exist."
+if [ ! -d "$MD_WORK" ]; then
+    echo "Directory $MD_WORK does not exist."
     exit 1
 fi
 

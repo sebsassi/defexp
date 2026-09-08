@@ -34,8 +34,13 @@ if [[ ! -d "$PROJ" ]]; then
     exit 1
 fi
 
-MD_WORK=$WORK/mdsim
 MD_PROJ=$PROJ/mdsim
+MD_WORK=$WORK/mdsim
+
+if [ ! -d "$MD_PROJ" ]; then
+    echo "Directory $MD_PROJ does not exist."
+    exit 1
+fi
 
 if [ ! -d "$MD_WORK" ]; then
     mkdir  $MD_WORK
