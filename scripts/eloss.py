@@ -182,11 +182,22 @@ def execute(args, thread_id):
         thermo: f"{args.work_dir}/thermo"
         log: f"{args.work_dir}/logs"
     }
+    for dir in base_dirs.values():
+        if not os.path.isdir(dir):
+            raise FileNotFoundError(f"{dir} is not a directory.")
+
     material_dirs = {k: f"{dir}/{args.material}" for k, dir in base_dirs.items()}
+    for dir in material_dirs.values():
+        if not os.path.isdir(dir):
+            raise FileNotFoundError(f"{dir} is not a directory.")
+
     if args.label is None:
         input_dirs = material_dirs
     else:
         input_dirs = {k: f"{dir}/{args.label}" for k, dir in material_dirs.items()}
+        for dir in input_dirs.values():
+            if not os.path.isdir(dir):
+                raise FileNotFoundError(f"{dir} is not a directory.")
 
     material = defexp.load_material(f"{args.config_dir}/materials", f"{args.config_dir}/potentials", args.material)
 
