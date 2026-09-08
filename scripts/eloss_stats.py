@@ -10,7 +10,9 @@ def load_eloss(fname: str):
     return np.loadtxt(fname)
 
 
-def healpix_stats(colat: np.ndarray, lon: np.ndarray, eloss: np.ndarray, nside: int):
+def healpix_stats(
+    colat: np.ndarray, lon: np.ndarray, eloss: np.ndarray, nside: int
+) -> tuple[np.ndarray, np.ndarray]:
     pixels = hp.pixelfunc.ang2pix(nside, colat, lon)
     means = np.zeros(12*nside**2)
     stdevs = np.zeros(12*nside**2)
@@ -21,38 +23,7 @@ def healpix_stats(colat: np.ndarray, lon: np.ndarray, eloss: np.ndarray, nside: 
     return means, stdevs
 
 
-def sh_transform(map: np.ndarray, nside: int):
-    return hp.sphtfunc.map2alm(map, lmax=2*nside, use_weights=True)
-
-
-def power_spectrum(map: np.ndarray, nside: int):
-    return hp.sphtfunc.anafast(map, lmax=2*nside, use_weights=True)
-
-
-def test_sh_transform():
-    rng = np.random.default_rng()
-    colat = np.acos(2.0*rng.random(24000) - 1.0)
-    lon = 2.0*np.pi*rng.random(24000)
-    eloss = rng.normal(60, 10, 24000)
-
-    nside = 4
-    means, stdevs = healpix_stats(colat, lon, eloss, nside)
-    print(means)
-    print(stdevs)
-
-    mean_power = power_spectrum(means, nside)
-    stdev_power = power_spectrum(stdevs, nside)
-    print(mean_power)
-    print(stdev_power)
-
-    lmax = 2*nside
-    l = np.arange(lmax + 1)
-    plt.plot(l, mean_power)
-    plt.plot(l, stdev_power)
-    plt.show()
-
-
-def plot(energies, data, colat, lon):
+def plot(energies: list[int], data: dict, colat: np.ndarray, lon: np.ndarray):
     fig_map = plt.figure()
     top_grid = gridspec.GridSpec(1, 2, figure=fig_map)
     mean_map_grid = top_grid[0].subgridspec(5, 2, hspace=0, wspace=0)
@@ -60,6 +31,10 @@ def plot(energies, data, colat, lon):
 
     mean_axes = mean_map_grid.subplots(sharex="col", sharey="row")
     stdev_axes = stdev_map_grid.subplots(sharex="col", sharey="row")
+
+    print(f"{"l":10s}", "".join([f"{l:10d}" for l in range(data["power"]["mean"][0].size)]))
+    for i, energy in enumerate(energies):
+        print(f"{f"{energy} eV":10s}", "".join([f"{power:10.5f}" for power in data["power"]["mean"][i]]))
 
     for i, energy in enumerate(energies):
         mean_axes[i//2][i % 2].pcolormesh(lon, colat, data["map"]["mean"][i], vmin=0.0)
@@ -70,8 +45,8 @@ def plot(energies, data, colat, lon):
     fig_map.tight_layout()
 
     fig_power, ax = plt.subplots(1, 2)
-    ax[0].imshow(np.array(data["power"]["mean"]))
-    ax[1].imshow(np.array(data["power"]["stdev"]))
+    ax[0].imshow(np.array(data["power"]["mean"]), norm="log")
+    ax[1].imshow(np.array(data["power"]["stdev"]), norm="log")
     fig_power.tight_layout()
     plt.show()
 
@@ -101,13 +76,17 @@ def eloss_analysis(eloss_dir: str, material: str, element: str, energies: list[i
         lon = data[:,2]
         eloss = data[:,4]
         means, stdevs = healpix_stats(colat, lon, eloss, nside)
-        anal_data["map"]["mean"].append(hp.pixelfunc.get_interp_val(means, map_colat_g, map_lon_g))
-        anal_data["map"]["stdev"].append(hp.pixelfunc.get_interp_val(stdevs, map_colat_g, map_lon_g))
 
-        mean_power = power_spectrum(means, nside)
-        stdev_power = power_spectrum(stdevs, nside)
+        mean_power, mean_coeffs = hp.sphtfunc.anafast(means, lmax=2*nside, use_weights=True, alm=True)
+        stdev_power, stdev_coeffs = hp.sphtfunc.anafast(stdevs, lmax=2*nside, use_weights=True, alm=True)
+
         anal_data["power"]["mean"].append(mean_power/mean_power[0])
         anal_data["power"]["stdev"].append(stdev_power/stdev_power[0])
+
+        mean_upsampled = hp.sphtfunc.alm2map(mean_coeffs, 2*nside)
+        stdev_upsampled = hp.sphtfunc.alm2map(stdev_coeffs, 2*nside)
+        anal_data["map"]["mean"].append(hp.pixelfunc.get_interp_val(mean_upsampled, map_colat_g, map_lon_g))
+        anal_data["map"]["stdev"].append(hp.pixelfunc.get_interp_val(stdev_upsampled, map_colat_g, map_lon_g))
 
     plot(energies, anal_data, map_colat_g, map_lon_g)
 

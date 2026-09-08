@@ -623,7 +623,6 @@ class LAMMPSIO:
         if not os.path.isdir(dump_dir):
             raise filenotfounderror(f"{dump_dir} is not a directory")
 
-        self.script_dir = f"{os.path.dirname(__file__)}/lammpsin"
         self.work_dir = work_dir
         self.dump_dir = dump_dir
 
@@ -634,59 +633,11 @@ class LAMMPSIO:
             os.remove(f)
 
 
-    def relax_script_path(self) -> str:
-        return f"{self.script_dir}/relaxation.lammpsin"
-
-
-    def impact_script_path(self) -> str:
-        return f"{self.script_dir}/impact.lammpsin"
-
-
     def log_file_name(self, uid=None) -> str:
         if uid is None:
             return f"{self.work_dir}/{self.label}.log"
         else:
             return f"{self.work_dir}/{self.label}_{uid:d}.log"
-
-
-    def pair_file_name(self, material: Material) -> str:
-        return f"{self.work_dir}/{material.label}_pair.lammpsin"
-
-
-    def write_pair_file(self, material: Material, verbosity: int = 0):
-        """
-        write a lammps input script file for the pair interaction.
-        """
-        fname = self.pair_file_name(material)
-        with open(fname, "w") as f:
-            f.truncate(0)
-            style_arg_str = " ".join(str(arg) for arg in material.pair_potential.style_args)
-            f.write(f"pair_style {material.pair_potential.style_name} {style_arg_str}\n")
-            coeff_arg_str = " ".join(str(arg) for arg in material.pair_potential.coeff_args)
-            f.write(f"pair_coeff * * \"{material.pair_potential.pot_file}\" {coeff_arg_str}\n")
-        if verbosity > 1: log_print(f"wrote pair file {fname}.")
-
-
-    def mass_file_name(self, material: Material) -> str:
-        return f"{self.work_dir}/{material.label}_masses.lammpsin"
-
-
-    def write_mass_file(self, material: Material, verbosity: int = 0):
-        """
-        write a file containing the atom masses in lammps script format.
-
-        parameters
-        ----------
-        verbosity : int, optional
-        dir : str, optional
-            directory where the file is written.
-        """
-        fname = self.mass_file_name(material)
-        with open(fname, "w") as f:
-            f.truncate(0)
-            for atom_type, props in material.atom_props.items():
-                f.write(f"mass {atom_type:d} {props['mass']:.10f}\n")
-        if verbosity > 1: log_print(f"wrote mass file {fname}.")
 
 
     def data_file_name(self, lattice: Lattice, label: str) -> str:
@@ -705,30 +656,6 @@ class LAMMPSIO:
         ase.io.lammpsdata.write_lammps_data(
                 fname, lattice.atoms, atom_style="atomic")
         if verbosity > 1: log_print(f"wrote file {fname}.")
-
-
-    def create_data_and_thermo_file(self, pid: int) -> tuple[str, str]:
-        """
-        creates data and thermo files if they don't already exist.
-
-        parameters
-        ----------
-        pid : int
-            process id.
-
-        returns
-        -------
-        df_name : str
-            name of output data file.
-        tf_name : str
-            name of thermo data file.
-        """
-        name = f"{self.work_dir}/{self.label}_impact_{pid}"
-        df_name = f"{name}.data"
-        tf_name = f"{name}.log"
-        if not os.path.isfile(df_name): open(df_name,"a").close()
-        if not os.path.isfile(tf_name): open(tf_name,"a").close()
-        return df_name, tf_name
 
 
 class RelaxSimulation:
@@ -789,8 +716,6 @@ class RelaxSimulation:
 
         self.lammps_io = lammps_io
         self.lammps_io.write_lammps_data(self.lattice, "default", verbosity)
-        self.lammps_io.write_mass_file(self.lattice.material, verbosity)
-        self.lammps_io.write_pair_file(self.lattice.material, verbosity)
 
         # Logging
         self.verbosity = verbosity
@@ -1233,113 +1158,6 @@ class RecoilSimulation:
             has_frenkel_defect, has_epot_defect, pid, unitv, energy, verbosity)
 
         return depot, has_frenkel_defect
-
-
-def scan_energy_range(
-    recoil_simulation: RecoilSimulation, atom_type: int, aind: int,
-    unitv: np.ndarray, energies: np.ndarray, pid: int, verbosity: int = 1,
-    screen: typing.Optional[str] = None, **kwargs
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Simulate recoils for a given direction with a range of recoil energies.
-
-    Parameters
-    ----------
-    atom_type : int
-        Type ID of recoiling atom.
-    aind : int
-        Index of the recoiling atom.
-    unitv : np.ndarray
-        Recoil direction.
-    energies : np.ndarray
-        Recoil energies.
-    pid : int
-        Process ID.
-
-    Returns
-    -------
-    depot : np.ndarray
-        Changes in potential energies from the start of the simulation to the
-        end of the simulation.
-    frenkel_defects : np.ndarray
-        Boolean array of whether a Frenkel defect was detected in a given
-        simulation.
-    """
-    df_name, tf_name = recoil_simulation.io.create_data_and_thermo_file(pid)
-
-    lammps_args = {"log": tf_name}
-    if screen is not None:
-        lammps_args["screen"] = screen
-
-    depot = np.zeros(energies.shape)
-    frenkel_defects = np.full(energies.shape, False)
-    for i in range(energies.shape[0]):
-        if verbosity == 2:
-            log_print(f"Energy {i + 1:d}/{energies.shape[0]:d}.")
-        elif verbosity > 2:
-            log_print(
-                f"Energy {i + 1:d}/{energies.shape[0]:d}: "
-                    f"{energies[i]:.5e}.")
-
-        depot[i], frenkel_defects[i] = recoil_simulation.run(
-            atom_type, aind, unitv, energies[i], df_name, lammps_args,
-            tf_name, pid, **kwargs)
-
-    return depot, frenkel_defects
-
-
-def sample_thermal_distribution(
-    recoil_simulation: RecoilSimulation, atom_type: int, aind: int,
-    unitv: np.ndarray, energy: float, count: int, pid: int, seed: int = 1254623,
-    screen: typing.Optional[str] = None, **kwargs
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Simulate recoils for a given direction and recoil energy for multiple initial
-    velocity distributions.
-
-    Parameters
-    ----------
-    atom_type : int
-        Type ID of recoiling atom.
-    aind : int
-        Index of the recoiling atom.
-    unitv : np.ndarray
-        Recoil direction.
-    energy : float
-        Recoil energy
-    count : int
-        Number of samples.
-    pid : int
-        Process ID.
-    seed : int
-        Seed to a random number generator.
-
-    Returns
-    -------
-    depot : np.ndarray
-        Changes in potential energies from the start of the simulation to the
-        end of the simulation.
-    frenkel_defects : np.ndarray
-        Boolean array of whether a Frenkel defect was detected in a given
-        simulation.
-    """
-    df_name, tf_name = recoil_simulation.io.create_data_and_thermo_file(pid)
-
-    lammps_args = {"log": tf_name}
-    if screen is not None:
-        lammps_args["screen"] = screen
-
-    rng = np.default_rng(seed)
-    seeds = rng.integers(0, np.iinfo(int).max, size=count)
-
-    depot = np.zeros(count)
-    frenkel_defects = np.full(count, False)
-    for i in range(count):
-        depot[i], frenkel_defects[i] = recoil_simulation.run(
-            atom_type, aind, unitv, energy, df_name, lammps_args, tf_name,
-            pid, seed=seeds[i], verbosity=verbosity, **kwargs)
-
-    return depot, frenkel_defects
 
 
 def symbols_from(atom_props: dict[str, typing.Any]) -> list[str]:

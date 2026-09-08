@@ -175,11 +175,18 @@ def execute(args, thread_id):
     logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
     logging.info(f"True seed: {seed}")
 
-    res_dir = f"{args.res_dir}/eloss/{args.material}"
-    lmp_dir = f"{args.work_dir}/lammps_work"
-    dump_dir = f"{args.work_dir}/dump"
-    thermo_dir = f"{args.work_dir}/thermo"
-    log_dir = f"{args.work_dir}/logs"
+    base_dirs = {
+        lmp: f"{args.work_dir}/lammps_work"
+        dump: f"{args.work_dir}/dump"
+        res: f"{args.res_dir}/eloss"
+        thermo: f"{args.work_dir}/thermo"
+        log: f"{args.work_dir}/logs"
+    }
+    material_dirs = {k: f"{dir}/{args.material}" for k, dir in base_dirs.items()}
+    if args.label is None:
+        input_dirs = material_dirs
+    else:
+        input_dirs = {k: f"{dir}/{args.label}" for k, dir in material_dirs.items()}
 
     material = defexp.load_material(f"{args.config_dir}/materials", f"{args.config_dir}/potentials", args.material)
 
@@ -189,13 +196,10 @@ def execute(args, thread_id):
         emin = args.energy
         emax = args.energy
 
-    if args.extra_label is None:
-        label = f"eloss_{material.label}"
-    else:
-        label = f"eloss_{material.label}_{args.extra_label}"
+    label = "eloss"
     exp_io = defexp.ExperimentIO(
-            label, res_dir, thermo_dir, log_dir, save_thermo=args.thermo)
-    lammps_io = defexp.LAMMPSIO(label, lmp_dir, dump_dir)
+            label, input_dirs["res"], input_dirs["thermo"], input_dirs["log"], save_thermo=args.thermo)
+    lammps_io = defexp.LAMMPSIO(label, input_dirs["lmp"], input_dirs["dump"])
 
     screen = None if args.screen else "none"
     simulation = defexp.RecoilSimulation(
@@ -215,30 +219,30 @@ if __name__ == "__main__":
     print("Running eloss.py")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("material", type=str, help="material name")
-    parser.add_argument("jid", type=int, help="job ID")
-    parser.add_argument("pid", type=int, help="process ID")
-    parser.add_argument("seed", type=int, help="input rng seed")
-    parser.add_argument("count", type=int, help="number of recoil experiments")
     parser.add_argument(      "--atom-symbols", type=str, nargs='+', default=None, help="list of chemical symbols of atoms for which simulations should be performed")
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
-    parser.add_argument("-c", "--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument(      "--constant-timestep", action="store_true", help="do not use adaptive timestep")
+    parser.add_argument("-c", "--count", type=int, default=None, help="number of recoil experiments")
     parser.add_argument("-D", "--direction", type=float, nargs=2, default=[0.0, 0.0], help="recoil directon as an angle pair ALT AZ in radians")
     parser.add_argument("-d", "--dump", action="store_true", help="make periodic dumps of simulation state")
     parser.add_argument("-E", "--energy", type=float, default=None, help="fixed recoil energy")
     parser.add_argument(      "--emin", type=float, default=None, help="minimum recoil energy")
     parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
-    parser.add_argument(      "--extra-label", type=str, default=None, help="extra label to attach to file names")
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
+    parser.add_argument("-j", "--jid", type=int, default=0, help="job ID")
+    parser.add_argument("-l", "--label", type=str, default=None, help="experiment label")
+    parser.add_argument("-m", "--material", type=str, default=None, "material name")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
     parser.add_argument("-n", "--num-threads", type=int, default=1, help="number of threads running separate simulations")
-    parser.add_argument("-p", "--pid-to-index", action="store_true", help="use process ID to index into unit cell; otherwise sample randomly")
+    parser.add_argument("-p", "--pid", type=int, default=0, help="process ID")
+    parser.add_argument(      "--pid-to-index", action="store_true", help="use process ID to index into unit cell; otherwise sample randomly")
     parser.add_argument("-r", "--raw-seed", action="store_true", help="use seed as is without mixing with jid, i, and timestamp")
     parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
-    parser.add_argument("-s", "--screen", action="store_true", help="print LAMMPS output to screen")
+    parser.add_argument("-S", "--screen", action="store_true", help="print LAMMPS output to screen")
+    parser.add_argument("-s", "--seed", type=int, default=0, help="input rng seed")
     parser.add_argument(      "--temperature", type=float, default=None, help="temperature of the system")
     parser.add_argument(      "--thermo", type=str, nargs="+", default=["Time","PotEng"], help="list of thermo quantities to save")
     parser.add_argument("-t", "--timeless-seed", action="store_true", help="do not mix timestamp into seed")
@@ -257,6 +261,10 @@ if __name__ == "__main__":
                 if getattr(args, key) == parser.get_default(key):
                     setattr(args, key, value)
 
+    if args.count is None:
+        raise RuntimeError("Argument `count` needs to be defined either in an input file or via the command line.")
+    if args.material is None:
+        raise RuntimeError("Argument `material` needs to be defined either in an input file or via the command line.")
     if args.timestep is None:
         raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
 

@@ -16,10 +16,6 @@ function load_modules()
     fi
 }
 
-SIMULATION=$1
-MATERIAL=$2
-shift 2
-
 if [[ -z "$WORK" ]]; then
     echo "Environment variable WORK is not defined."
     exit 1
@@ -77,7 +73,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-srun python "$MD_PROJ/defexp/scripts/relax.py" "$MATERIAL" \
+srun python "$MD_PROJ/defexp/scripts/relax.py" \
     --config-dir "$MD_PROJ/defexp/samples" --work-dir "$MD_WORK" --res-dir "$MD_WORK" $@
 
 deactivate

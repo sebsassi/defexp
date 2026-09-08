@@ -16,11 +16,6 @@ function load_modules()
     fi
 }
 
-MATERIAL=$1
-COUNT=$2
-SEED=1337
-shift 2
-
 if [[ -z "$WORK" ]]; then
     echo "Environment variable WORK is not defined."
     exit 1
@@ -95,7 +90,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-srun python "$MD_PROJ/defexp/scripts/eloss.py" "$MATERIAL" "$SLURM_JOB_ID" "$SLURM_ARRAY_TASK_ID" "$SEED" "$COUNT" \
+srun python "$MD_PROJ/defexp/scripts/eloss.py" -j "$SLURM_JOB_ID" -p "$SLURM_ARRAY_TASK_ID" \
     --config-dir "$MD_PROJ/defexp/samples" --res-dir "$MD_WORK" --work-dir "$MD_WORK" -n "$SLURM_CPUS_PER_TASK" $@
 
 deactivate
