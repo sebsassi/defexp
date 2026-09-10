@@ -41,11 +41,11 @@ if __name__ == "__main__":
         raise RuntimeError("Argument `timestep` needs to be defined either in an input file or via the command line.")
 
     base_dirs = {
-        lmp: f"{args.work_dir}/lammps_work"
-        dump: f"{args.work_dir}/dump"
-        res: f"{args.res_dir}/eloss"
-        thermo: f"{args.work_dir}/thermo"
-        log: f"{args.work_dir}/logs"
+        "lmp": f"{args.work_dir}/lammps_work",
+        "dump": f"{args.work_dir}/dump",
+        "res": f"{args.res_dir}/eloss",
+        "thermo": f"{args.work_dir}/thermo",
+        "log": f"{args.work_dir}/logs"
     }
     for dir in base_dirs.values():
         if not os.path.isdir(dir): os.mkdir(dir)

@@ -163,24 +163,24 @@ def execute(args, thread_id):
     else:
         seed = abs(hash((args.seed, args.jid, args.pid, timestamp)))
 
-    if args.extra_label is None:
+    if args.label is None:
         logging.basicConfig(
                 filename=f"eloss_{args.material}_{args.jid:d}_{args.pid:d}_{args.seed:d}_{args.count:d}.log",
                 level=logging.DEBUG)
     else:
         logging.basicConfig(
-                filename=f"eloss_{args.material}_{args.extra_label}_{args.jid:d}_{args.pid:d}_{args.seed:d}_{args.count:d}.log",
+                filename=f"eloss_{args.material}_{args.label}_{args.jid:d}_{args.pid:d}_{args.seed:d}_{args.count:d}.log",
                 level=logging.DEBUG)
     logging.info(f"args: {json.dumps(vars(args), indent=4)}")
     logging.info(f"Date: {datetime.datetime.fromtimestamp(timestamp)}")
     logging.info(f"True seed: {seed}")
 
     base_dirs = {
-        lmp: f"{args.work_dir}/lammps_work"
-        dump: f"{args.work_dir}/dump"
-        res: f"{args.res_dir}/eloss"
-        thermo: f"{args.work_dir}/thermo"
-        log: f"{args.work_dir}/logs"
+        "lmp": f"{args.work_dir}/lammps_work",
+        "dump": f"{args.work_dir}/dump",
+        "res": f"{args.res_dir}/eloss",
+        "thermo": f"{args.work_dir}/thermo",
+        "log": f"{args.work_dir}/logs"
     }
     for dir in base_dirs.values():
         if not os.path.isdir(dir):
