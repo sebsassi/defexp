@@ -242,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
     parser.add_argument("-j", "--jid", type=int, default=0, help="job ID")
     parser.add_argument("-l", "--label", type=str, default=None, help="experiment label")
-    parser.add_argument("-m", "--material", type=str, default=None, "material name")
+    parser.add_argument("-m", "--material", type=str, default=None, help="material name")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
     parser.add_argument(      "--max-duration", type=float, default=None, help="maximum simulation duration in picoseconds")
