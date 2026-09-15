@@ -48,11 +48,13 @@ if __name__ == "__main__":
         "log": f"{args.work_dir}/logs"
     }
     for dir in base_dirs.values():
-        if not os.path.isdir(dir): os.mkdir(dir)
+        if not os.path.isdir(dir):
+            raise FileNotFoundError(f"{dir} is not a directory.")
 
     material_dirs = {k: f"{dir}/{args.material}" for k, dir in base_dirs.items()}
     for dir in material_dirs.values():
-        if not os.path.isdir(f"{dir}"): os.mkdir(f"{dir}")
+        if not os.path.isdir(f"{dir}"):
+            raise FileNotFoundError(f"{dir} is not a directory.")
 
     if args.label is None:
         input_dirs = material_dirs
