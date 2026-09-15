@@ -8,6 +8,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--materials", type=str, nargs="+", default=None, help="material names")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
+    args = parser.parse_args()
 
     base_dirs = {
         "lmp": f"{args.work_dir}/lammps_work",
