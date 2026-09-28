@@ -230,7 +230,7 @@ if __name__ == "__main__":
     print("Running eloss.py")
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(      "--atom-symbols", type=str, nargs='+', default=None, help="list of chemical symbols of atoms for which simulations should be performed")
+    parser.add_argument(      "--atom-symbols", type=str, nargs="+", default=None, help="list of chemical symbols of atoms for which simulations should be performed")
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument(      "--constant-timestep", action="store_true", help="do not use adaptive timestep")
     parser.add_argument("-c", "--count", type=int, default=None, help="number of recoil experiments")
@@ -241,7 +241,7 @@ if __name__ == "__main__":
     parser.add_argument(      "--emax", type=float, default=None, help="maximum recoil energy")
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
     parser.add_argument("-j", "--jid", type=int, default=0, help="job ID")
-    parser.add_argument("-l", "--label", type=str, default=None, help="experiment label")
+    parser.add_argument("-l", "--label", type=str, default=None, help="simulation label")
     parser.add_argument("-m", "--material", type=str, default=None, help="material name")
     parser.add_argument("-a", "--max-angle", type=float, default=np.pi, help="maximum deviation from the average recoil direction")
     parser.add_argument(      "--max-displacement", type=float, default=None, help="maximum atom displacement allowed in a single timestep")
