@@ -12,7 +12,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-C", "--config-dir", type=str, default=".", help="directory containing material/simulation configuration files")
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
-    parser.add_argument("-l", "--label", type=str, default=None, help="experiment label")
+    parser.add_argument("-l", "--label", type=str, default=None, help="simulation label")
     parser.add_argument("-m", "--material", type=str, default=None, help="material name")
     parser.add_argument(      "--relax-duration", type=float, default=2.0, help="simulation duration in picoseconds")
     parser.add_argument(      "--repeat", type=float, nargs=3, default=None, help="number of repeated unit cells along each axis")

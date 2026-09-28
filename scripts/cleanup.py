@@ -7,8 +7,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-I", "--input-file", type=str, default=None, help="JSON file providing same parameters as the command line (command line arguments override values in the file)")
-    parser.add_argument("-l", "--label", type=str, default=None, help="experiment label")
-    parser.add_argument("-m", "--material", type=str, default=None, "material name")
+    parser.add_argument("-l", "--label", type=str, default=None, help="simulation label")
+    parser.add_argument("-m", "--material", type=str, default=None, help="material name")
     parser.add_argument(      "--remove-res", action="store_true", help="remove result files")
     parser.add_argument("-R", "--res-dir", type=str, default=".", help="output directory for main results")
     parser.add_argument("-W", "--work-dir", type=str, default=".", help="output directory for intermediate/auxillary files")
