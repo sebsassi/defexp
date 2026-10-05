@@ -572,12 +572,12 @@ class ExperimentIO:
         if self.save_thermo is not None:
             data = np.column_stack([thermo_info[key] for key in self.save_thermo])
             if binary:
-                fname = f"{self.thermo_dir}/{self.label}_thermo_{hash((pid, aind, energy, tuple(direction)))}.dat"
+                fname = f"{self.thermo_dir}/{self.label}_thermo_{hash((pid, aind, energy, tuple(unitv)))}.dat"
                 np.savez(fname,
                          aind=np.array([aind]), energy=np.array([aind]), direction=unitv,
                          columns=np.array(self.save_thermo), thermo=data)
             else:
-                fname = f"{self.thermo_dir}/{self.label}_thermo_{hash((pid, aind, energy, tuple(direction)))}.npz"
+                fname = f"{self.thermo_dir}/{self.label}_thermo_{hash((pid, aind, energy, tuple(unitv)))}.npz"
                 header = (
                         f"aind = {aind}\n"
                         f"energy = {energy:.16e} ev\n"
